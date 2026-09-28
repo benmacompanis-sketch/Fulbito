@@ -146,22 +146,66 @@ function aportePorPosicion(jugador) {
   return aporte;
 }
 
-// Cuántos jugadores de cada posición principal tiene un equipo
-function contarPosiciones(nombres) {
+// Decide en qué puesto juega cada jugador dentro de su equipo.
+// Devuelve algo como { "Pepe": "ARQ", "Tito": "DEF", ... }.
+//
+// 1. Todos arrancan en su posición principal.
+// 2. Si al equipo le falta un puesto (primero el arco, después defensa,
+//    medio y delantera), lo ocupa alguien que lo tenga de secundaria.
+//    Sale de su puesto el que deja menos hueco: el que tiene más
+//    compañeros en su posición; si empatan, el de menor media.
+//    Para el arco se acepta dejar otro puesto vacío; para los demás, no.
+function asignarPuestos(nombres) {
+  const puestos = {};
   const cuenta = { ARQ: 0, DEF: 0, MED: 0, DEL: 0 };
+
   for (const nombre of nombres) {
     const jugador = buscarJugador(nombre);
+    puestos[nombre] = jugador.posicion;
     if (jugador.posicion) cuenta[jugador.posicion]++;
   }
-  return cuenta;
+
+  for (const puesto of POSICIONES) {
+    if (cuenta[puesto] > 0) continue;
+
+    let elegido = null;
+    for (const nombre of nombres) {
+      const jugador = buscarJugador(nombre);
+      const actual = puestos[nombre];
+      if (!jugador.secundarias.includes(puesto)) continue;
+      if (!actual) continue;
+      if (puesto !== "ARQ" && cuenta[actual] < 2) continue;
+
+      if (elegido === null) {
+        elegido = nombre;
+      } else {
+        const companerosNuevo = cuenta[actual];
+        const companerosElegido = cuenta[puestos[elegido]];
+        const mediaNuevo = mediaJugador(jugador);
+        const mediaElegido = mediaJugador(buscarJugador(elegido));
+        if (companerosNuevo > companerosElegido ||
+            (companerosNuevo === companerosElegido && mediaNuevo < mediaElegido)) {
+          elegido = nombre;
+        }
+      }
+    }
+
+    if (elegido !== null) {
+      cuenta[puestos[elegido]]--;
+      puestos[elegido] = puesto;
+      cuenta[puesto]++;
+    }
+  }
+  return puestos;
 }
 
-// ¿Alguien del equipo puede atajar (de principal o de secundaria)?
-function tieneArquero(nombres) {
-  return nombres.some(nombre => {
-    const jugador = buscarJugador(nombre);
-    return jugador.posicion === "ARQ" || jugador.secundarias.includes("ARQ");
-  });
+// Cuántos jugadores hay en cada puesto, según asignarPuestos
+function contarPuestos(puestos) {
+  const cuenta = { ARQ: 0, DEF: 0, MED: 0, DEL: 0 };
+  for (const puesto of Object.values(puestos)) {
+    if (puesto) cuenta[puesto]++;
+  }
+  return cuenta;
 }
 
 
@@ -490,18 +534,6 @@ function armarEquipos(esOtraCombinacion) {
     return;
   }
 
-  // Ordenamos cada equipo por posición (arquero primero) y después de mejor a peor
-  for (const grupo of grupos) {
-    grupo.sort((x, y) => {
-      const jx = buscarJugador(x);
-      const jy = buscarJugador(y);
-      const ordenX = jx.posicion ? POSICIONES.indexOf(jx.posicion) : POSICIONES.length;
-      const ordenY = jy.posicion ? POSICIONES.indexOf(jy.posicion) : POSICIONES.length;
-      if (ordenX !== ordenY) return ordenX - ordenY;
-      return mediaJugador(jy) - mediaJugador(jx);
-    });
-  }
-
   equipos = grupos.map((grupo, i) => ({ nombre: "Equipo " + (i + 1), jugadores: grupo }));
   formatoActual = formato;
   partidos = [];
@@ -573,7 +605,8 @@ function mostrarEquipos() {
       .map(a => NOMBRES_ATRIBUTOS[a] + " " + redondear(mediaGrupo(equipo.jugadores, a)))
       .join(" · ");
 
-    const cuenta = contarPosiciones(equipo.jugadores);
+    const puestos = asignarPuestos(equipo.jugadores);
+    const cuenta = contarPuestos(puestos);
     const posiciones = POSICIONES.map(p => cuenta[p] + " " + p).join(" · ");
 
     let aviso = "";
@@ -581,7 +614,7 @@ function mostrarEquipos() {
       aviso += `<p class="mensaje error">Tiene ${equipo.jugadores.length} y F${formatoActual} pide ${formatoActual}.</p>`;
     }
     const hayPosicionesCargadas = jugadores.some(j => j.posicion);
-    if (hayPosicionesCargadas && !tieneArquero(equipo.jugadores)) {
+    if (hayPosicionesCargadas && cuenta.ARQ === 0) {
       aviso += `<p class="mensaje error">Nadie de este equipo juega de arquero.</p>`;
     }
 
@@ -596,18 +629,39 @@ function mostrarEquipos() {
         ${aviso}
         <ul>`;
 
-    equipo.jugadores.forEach((nombre, p) => {
+    // Los mostramos por el puesto en que juegan (arquero, defensores, medios,
+    // delanteros) y dentro de cada puesto de mejor a peor. Guardamos el lugar
+    // original en la lista para poder moverlos a otro equipo.
+    const orden = equipo.jugadores.map((nombre, lugar) => ({ nombre, lugar }));
+    orden.sort((x, y) => {
+      const px = puestos[x.nombre] ? POSICIONES.indexOf(puestos[x.nombre]) : POSICIONES.length;
+      const py = puestos[y.nombre] ? POSICIONES.indexOf(puestos[y.nombre]) : POSICIONES.length;
+      if (px !== py) return px - py;
+      return mediaJugador(buscarJugador(y.nombre)) - mediaJugador(buscarJugador(x.nombre));
+    });
+
+    for (const { nombre, lugar } of orden) {
       const jugador = buscarJugador(nombre);
+      const puesto = puestos[nombre];
+
+      // Si juega de una posición secundaria, el cartelito se ve distinto
+      let cartel = "";
+      if (puesto === jugador.posicion) {
+        cartel = `<span class="puesto">${puesto}</span>`;
+      } else if (puesto) {
+        cartel = `<span class="puesto cambiado" title="Juega de su posición secundaria">${puesto}</span>`;
+      }
+
       let opciones = "";
       equipos.forEach((otro, o) => {
         opciones += `<option value="${o}" ${o === e ? "selected" : ""}>${escapar(otro.nombre)}</option>`;
       });
       html += `
           <li>
-            <span>${escapar(nombre)} <span class="posicion">${textoPosiciones(jugador)}</span> (${redondear(mediaJugador(jugador))})</span>
-            <select title="Mover a otro equipo" onchange="moverJugador(${e}, ${p}, this.value)">${opciones}</select>
+            <span>${cartel} ${escapar(nombre)} <span class="posicion">${textoPosiciones(jugador)}</span> (${redondear(mediaJugador(jugador))})</span>
+            <select title="Mover a otro equipo" onchange="moverJugador(${e}, ${lugar}, this.value)">${opciones}</select>
           </li>`;
-    });
+    }
 
     html += `
         </ul>

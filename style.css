@@ -114,6 +114,26 @@ input[type="checkbox"] {
   white-space: nowrap;
 }
 
+/* Cartelito con el puesto en que juega dentro del equipo */
+.puesto {
+  display: inline-block;
+  min-width: 38px;
+  padding: 1px 4px;
+  border: 1px solid #1f7a3a;
+  border-radius: 4px;
+  background-color: #1f7a3a;
+  color: white;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Cuando juega de su posición secundaria */
+.puesto.cambiado {
+  background-color: white;
+  color: #1f7a3a;
+}
+
 .opciones label:has(input[type="checkbox"]) {
   flex-direction: row;
   align-items: center;

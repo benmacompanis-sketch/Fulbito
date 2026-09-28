@@ -10,6 +10,9 @@ Hay dos versiones que hacen lo mismo:
   equipos se emparejan la media y la cantidad de jugadores por posición (la
   principal cuenta 1 y cada secundaria medio), y avisa si un equipo queda sin
   nadie que ataje. Se puede destildar "Emparejar también por posiciones".
+  Dentro de cada equipo, si falta un puesto (primero el arco) lo cubre alguien
+  que lo tenga de secundaria, y los jugadores se muestran en orden de arquero,
+  defensores, mediocampistas y delanteros según el puesto en que juegan.
 - **Versión de consola en Python** (`main.py` y la carpeta `futbol/`), explicada abajo.
 
 Para probar la versión web sin internet, abrí `index.html` con doble clic.
