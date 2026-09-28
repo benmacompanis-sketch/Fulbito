@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fulbito - Organizador de equipos</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <h1>⚽ Fulbito</h1>
+    <p>Organizador de equipos y torneos parejos</p>
+  </header>
+
+  <main>
+
+    <!-- 1. JUGADORES -->
+    <section>
+      <h2>1. Jugadores</h2>
+      <p class="ayuda">Cargá cada jugador con sus atributos del 1 al 99. Si ponés un nombre que ya existe, se actualizan sus números.</p>
+
+      <form id="formJugador">
+        <input type="text" id="nombre" placeholder="Nombre" required>
+        <label>Ritmo <input type="number" id="ritmo" min="1" max="99" required></label>
+        <label>Pase <input type="number" id="pase" min="1" max="99" required></label>
+        <label>Regate <input type="number" id="regate" min="1" max="99" required></label>
+        <label>Defensa <input type="number" id="defensa" min="1" max="99" required></label>
+        <button type="submit">Guardar jugador</button>
+      </form>
+      <p id="mensajeJugador" class="mensaje"></p>
+
+      <div class="tabla-con-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Juega</th>
+              <th>Nombre</th>
+              <th>RIT</th>
+              <th>PAS</th>
+              <th>REG</th>
+              <th>DEF</th>
+              <th>Media</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tablaJugadores"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 2. EQUIPOS -->
+    <section>
+      <h2>2. Equipos</h2>
+      <p class="ayuda">Se reparten los jugadores que tienen tildado "Juega". Si sobran, quedan como suplentes.</p>
+
+      <div class="opciones">
+        <label>Formato
+          <select id="formato">
+            <option value="5">F5</option>
+            <option value="8">F8</option>
+            <option value="11">F11</option>
+          </select>
+        </label>
+        <label>Cantidad de equipos
+          <input type="number" id="cantidadEquipos" value="2" min="2">
+        </label>
+        <button id="botonArmar">Armar equipos parejos</button>
+        <button id="botonOtra" class="secundario">Otra combinación</button>
+      </div>
+      <p id="mensajeEquipos" class="mensaje"></p>
+
+      <div id="equipos"></div>
+      <p id="resumenEquipos" class="resumen"></p>
+    </section>
+
+    <!-- 3. TORNEO -->
+    <section>
+      <h2>3. Torneo</h2>
+      <p class="ayuda">Todos contra todos con los equipos de arriba. Cada cruce se juega una sola vez (o dos con ida y vuelta).</p>
+
+      <div class="opciones">
+        <label><input type="checkbox" id="idaYVuelta"> Ida y vuelta</label>
+        <button id="botonTorneo">Armar torneo</button>
+      </div>
+      <p id="mensajeTorneo" class="mensaje"></p>
+
+      <div id="fixture"></div>
+
+      <h3>Tabla de posiciones</h3>
+      <div class="tabla-con-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Equipo</th>
+              <th>PJ</th>
+              <th>G</th>
+              <th>E</th>
+              <th>P</th>
+              <th>GF</th>
+              <th>GC</th>
+              <th>DG</th>
+              <th>Pts</th>
+            </tr>
+          </thead>
+          <tbody id="tablaPosiciones"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    No inventa jugadores, no repite equipos y los atributos los ponés vos.
+    <br>
+    <button id="botonBorrarTodo" class="peligro">Borrar todos los datos</button>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>

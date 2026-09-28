@@ -1,5 +1,16 @@
 # Organizador de equipos y torneos de fútbol
 
+Hay dos versiones que hacen lo mismo:
+
+- **Versión web** (`index.html`, `style.css`, `script.js`): se abre en el navegador,
+  también desde el celular. Publicada en https://benmacompanis-sketch.github.io/Fulbito/
+  Los datos quedan guardados en ese navegador.
+- **Versión de consola en Python** (`main.py` y la carpeta `futbol/`), explicada abajo.
+
+Para probar la versión web sin internet, abrí `index.html` con doble clic.
+
+## Versión de consola (Python)
+
 Programa de consola en Python para armar equipos parejos y torneos a partir de las
 estadísticas que vos cargás de cada jugador. No usa dependencias externas: sólo la
 biblioteca estándar (Python 3.10 o más nuevo).

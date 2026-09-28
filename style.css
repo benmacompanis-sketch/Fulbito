@@ -1,0 +1,246 @@
+/* Estilos simples para Fulbito */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #eef3ee;
+  color: #1d2b1f;
+}
+
+header {
+  background-color: #1f7a3a;
+  color: white;
+  text-align: center;
+  padding: 20px 16px;
+}
+
+header h1 {
+  margin: 0;
+}
+
+header p {
+  margin: 6px 0 0 0;
+}
+
+main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+section {
+  background-color: white;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+}
+
+h2 {
+  margin-top: 0;
+  color: #1f7a3a;
+}
+
+.ayuda {
+  color: #5b6b5d;
+  font-size: 14px;
+}
+
+/* Formularios */
+
+form,
+.opciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+}
+
+input,
+select {
+  padding: 8px;
+  font-size: 16px;
+  border: 1px solid #b8c7ba;
+  border-radius: 6px;
+}
+
+input[type="number"] {
+  width: 80px;
+}
+
+#cantidadEquipos {
+  width: 100px;
+}
+
+input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+}
+
+.opciones label:has(input[type="checkbox"]) {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+button {
+  padding: 9px 14px;
+  font-size: 15px;
+  border: none;
+  border-radius: 6px;
+  background-color: #1f7a3a;
+  color: white;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #17602d;
+}
+
+button.secundario {
+  background-color: #5b6b5d;
+}
+
+button.chico {
+  padding: 4px 8px;
+  font-size: 13px;
+}
+
+button.peligro {
+  background-color: #b3261e;
+  margin-top: 10px;
+}
+
+.mensaje {
+  font-weight: bold;
+  min-height: 1em;
+}
+
+.mensaje.error {
+  color: #b3261e;
+}
+
+.mensaje.ok {
+  color: #1f7a3a;
+}
+
+/* Tablas */
+
+.tabla-con-scroll {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+th,
+td {
+  padding: 6px 8px;
+  text-align: center;
+  border-bottom: 1px solid #dde5de;
+}
+
+th {
+  background-color: #f2f6f2;
+}
+
+td.nombre {
+  text-align: left;
+}
+
+/* Equipos */
+
+#equipos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.equipo {
+  border: 2px solid #1f7a3a;
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.equipo h3 {
+  margin: 0 0 4px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.equipo .medias {
+  font-size: 13px;
+  color: #5b6b5d;
+  margin-bottom: 8px;
+}
+
+.equipo ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.equipo li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid #eef3ee;
+}
+
+.equipo li select {
+  font-size: 13px;
+  padding: 3px;
+}
+
+.resumen {
+  font-weight: bold;
+}
+
+/* Fixture */
+
+.fecha {
+  margin-top: 12px;
+}
+
+.partido {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+  border-bottom: 1px solid #eef3ee;
+}
+
+.partido input {
+  width: 55px;
+}
+
+.libre {
+  color: #5b6b5d;
+  font-size: 14px;
+}
+
+footer {
+  text-align: center;
+  color: #5b6b5d;
+  padding: 16px;
+  font-size: 14px;
+}
