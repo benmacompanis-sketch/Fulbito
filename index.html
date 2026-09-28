@@ -18,7 +18,7 @@
     <!-- 1. JUGADORES -->
     <section>
       <h2>1. Jugadores</h2>
-      <p class="ayuda">Cargá cada jugador con sus atributos del 1 al 99. Si ponés un nombre que ya existe, se actualizan sus números.</p>
+      <p class="ayuda">Cargá cada jugador con sus atributos del 1 al 99, su posición principal y, si querés, en qué otras posiciones puede jugar. Si ponés un nombre que ya existe, se actualizan sus datos.</p>
 
       <form id="formJugador">
         <input type="text" id="nombre" placeholder="Nombre" required>
@@ -26,6 +26,22 @@
         <label>Pase <input type="number" id="pase" min="1" max="99" required></label>
         <label>Regate <input type="number" id="regate" min="1" max="99" required></label>
         <label>Defensa <input type="number" id="defensa" min="1" max="99" required></label>
+        <label>Posición principal
+          <select id="posicion">
+            <option value="">Elegí...</option>
+            <option value="ARQ">Arquero</option>
+            <option value="DEF">Defensor</option>
+            <option value="MED">Mediocampista</option>
+            <option value="DEL">Delantero</option>
+          </select>
+        </label>
+        <fieldset class="secundarias">
+          <legend>También puede jugar de (opcional)</legend>
+          <label><input type="checkbox" name="secundaria" value="ARQ"> Arquero</label>
+          <label><input type="checkbox" name="secundaria" value="DEF"> Defensor</label>
+          <label><input type="checkbox" name="secundaria" value="MED"> Mediocampista</label>
+          <label><input type="checkbox" name="secundaria" value="DEL"> Delantero</label>
+        </fieldset>
         <button type="submit">Guardar jugador</button>
       </form>
       <p id="mensajeJugador" class="mensaje"></p>
@@ -36,6 +52,7 @@
             <tr>
               <th>Juega</th>
               <th>Nombre</th>
+              <th>Posición</th>
               <th>RIT</th>
               <th>PAS</th>
               <th>REG</th>
@@ -52,7 +69,12 @@
     <!-- 2. EQUIPOS -->
     <section>
       <h2>2. Equipos</h2>
-      <p class="ayuda">Se reparten los jugadores que tienen tildado "Juega". Si sobran, quedan como suplentes.</p>
+      <p class="ayuda">
+        Se reparten los jugadores que tienen tildado "Juega". Si sobran, quedan como suplentes.
+        Con "Emparejar también por posiciones", además de la media se busca que cada equipo tenga
+        parecida la cantidad de arqueros, defensores, mediocampistas y delanteros
+        (la posición principal cuenta 1 y cada secundaria cuenta medio).
+      </p>
 
       <div class="opciones">
         <label>Formato
@@ -65,6 +87,7 @@
         <label>Cantidad de equipos
           <input type="number" id="cantidadEquipos" value="2" min="2">
         </label>
+        <label><input type="checkbox" id="usarPosiciones" checked> Emparejar también por posiciones</label>
         <button id="botonArmar">Armar equipos parejos</button>
         <button id="botonOtra" class="secundario">Otra combinación</button>
       </div>

@@ -87,6 +87,33 @@ input[type="checkbox"] {
   height: 20px;
 }
 
+.secundarias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  border: 1px solid #b8c7ba;
+  border-radius: 6px;
+  padding: 6px 10px 8px 10px;
+  margin: 0;
+}
+
+.secundarias legend {
+  font-size: 14px;
+  padding: 0 4px;
+}
+
+.secundarias label {
+  flex-direction: row;
+  align-items: center;
+  gap: 5px;
+}
+
+.posicion {
+  font-size: 13px;
+  color: #5b6b5d;
+  white-space: nowrap;
+}
+
 .opciones label:has(input[type="checkbox"]) {
   flex-direction: row;
   align-items: center;

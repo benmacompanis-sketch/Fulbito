@@ -5,6 +5,11 @@ Hay dos versiones que hacen lo mismo:
 - **Versión web** (`index.html`, `style.css`, `script.js`): se abre en el navegador,
   también desde el celular. Publicada en https://benmacompanis-sketch.github.io/Fulbito/
   Los datos quedan guardados en ese navegador.
+  Además de los atributos, cada jugador tiene una posición principal (Arquero,
+  Defensor, Mediocampista o Delantero) y las secundarias que quieras. Al armar
+  equipos se emparejan la media y la cantidad de jugadores por posición (la
+  principal cuenta 1 y cada secundaria medio), y avisa si un equipo queda sin
+  nadie que ataje. Se puede destildar "Emparejar también por posiciones".
 - **Versión de consola en Python** (`main.py` y la carpeta `futbol/`), explicada abajo.
 
 Para probar la versión web sin internet, abrí `index.html` con doble clic.

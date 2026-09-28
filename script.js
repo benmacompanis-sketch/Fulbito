@@ -4,7 +4,8 @@
 
 // ---------- DATOS ----------
 
-// Cada jugador: { nombre, ritmo, pase, regate, defensa, juega }
+// Cada jugador: { nombre, ritmo, pase, regate, defensa, posicion, secundarias, juega }
+// posicion es la principal ("ARQ", "DEF", "MED" o "DEL") y secundarias es una lista
 let jugadores = [];
 
 // Cada equipo: { nombre, jugadores: [nombres de los jugadores] }
@@ -20,6 +21,13 @@ let formatoActual = 5;
 
 const ATRIBUTOS = ["ritmo", "pase", "regate", "defensa"];
 const NOMBRES_ATRIBUTOS = { ritmo: "Ritmo", pase: "Pase", regate: "Regate", defensa: "Defensa" };
+
+const POSICIONES = ["ARQ", "DEF", "MED", "DEL"];
+const NOMBRES_POSICIONES = { ARQ: "Arquero", DEF: "Defensor", MED: "Mediocampista", DEL: "Delantero" };
+
+// Cuánto pesa que las posiciones queden desparejas, comparado con la media.
+// Con 1, tener un delantero de más que otro equipo pesa igual que un punto de media.
+const PESO_POSICIONES = 1;
 
 
 // ---------- GUARDAR Y CARGAR (en el navegador) ----------
@@ -39,6 +47,11 @@ function cargar() {
     if (texto) {
       const datos = JSON.parse(texto);
       jugadores = datos.jugadores || [];
+      // Los jugadores cargados antes de que existieran las posiciones quedan sin posición
+      for (const jugador of jugadores) {
+        if (!jugador.posicion) jugador.posicion = "";
+        if (!Array.isArray(jugador.secundarias)) jugador.secundarias = [];
+      }
       equipos = datos.equipos || [];
       partidos = datos.partidos || [];
       combinacionesVistas = datos.combinacionesVistas || [];
@@ -109,21 +122,95 @@ function diferenciaDeMedias(grupos) {
   return Math.max(...medias) - Math.min(...medias);
 }
 
-// Lo mismo, pero más rápido: usa las medias ya calculadas en "mediasGuardadas".
-// Se usa mientras se buscan equipos, que prueba miles de combinaciones.
-let mediasGuardadas = {};
 
-function diferenciaRapida(grupos) {
-  let mayor = -Infinity;
-  let menor = Infinity;
+
+// ---------- POSICIONES ----------
+
+// Texto corto para mostrar: "ARQ (DEF, MED)"
+function textoPosiciones(jugador) {
+  if (!jugador.posicion) return "Sin posición";
+  let texto = jugador.posicion;
+  if (jugador.secundarias.length > 0) {
+    texto += " (" + jugador.secundarias.join(", ") + ")";
+  }
+  return texto;
+}
+
+// Cuánto aporta un jugador a cada posición: 1 la principal y 0,5 cada secundaria
+function aportePorPosicion(jugador) {
+  const aporte = { ARQ: 0, DEF: 0, MED: 0, DEL: 0 };
+  if (jugador.posicion) aporte[jugador.posicion] = 1;
+  for (const posicion of jugador.secundarias) {
+    if (posicion !== jugador.posicion) aporte[posicion] = 0.5;
+  }
+  return aporte;
+}
+
+// Cuántos jugadores de cada posición principal tiene un equipo
+function contarPosiciones(nombres) {
+  const cuenta = { ARQ: 0, DEF: 0, MED: 0, DEL: 0 };
+  for (const nombre of nombres) {
+    const jugador = buscarJugador(nombre);
+    if (jugador.posicion) cuenta[jugador.posicion]++;
+  }
+  return cuenta;
+}
+
+// ¿Alguien del equipo puede atajar (de principal o de secundaria)?
+function tieneArquero(nombres) {
+  return nombres.some(nombre => {
+    const jugador = buscarJugador(nombre);
+    return jugador.posicion === "ARQ" || jugador.secundarias.includes("ARQ");
+  });
+}
+
+
+// ---------- QUÉ TAN PAREJOS SON UNOS EQUIPOS ----------
+
+// Mientras se buscan equipos se prueban miles de combinaciones, así que
+// guardamos de antemano la media y el aporte por posición de cada jugador.
+let mediasGuardadas = {};
+let aportesGuardados = {};
+let usarPosiciones = true;
+
+// Cuanto más bajo, más parejos. Suma:
+//  - la diferencia de media entre el mejor y el peor equipo
+//  - por cada posición, la diferencia entre el equipo que más tiene y el que menos
+function costoRapido(grupos) {
+  let mayorMedia = -Infinity;
+  let menorMedia = Infinity;
+  const mayorPorPosicion = { ARQ: -Infinity, DEF: -Infinity, MED: -Infinity, DEL: -Infinity };
+  const menorPorPosicion = { ARQ: Infinity, DEF: Infinity, MED: Infinity, DEL: Infinity };
+
   for (const grupo of grupos) {
     let suma = 0;
-    for (const nombre of grupo) suma += mediasGuardadas[nombre];
+    const cuenta = { ARQ: 0, DEF: 0, MED: 0, DEL: 0 };
+    for (const nombre of grupo) {
+      suma += mediasGuardadas[nombre];
+      const aporte = aportesGuardados[nombre];
+      cuenta.ARQ += aporte.ARQ;
+      cuenta.DEF += aporte.DEF;
+      cuenta.MED += aporte.MED;
+      cuenta.DEL += aporte.DEL;
+    }
+
     const media = suma / grupo.length;
-    if (media > mayor) mayor = media;
-    if (media < menor) menor = media;
+    if (media > mayorMedia) mayorMedia = media;
+    if (media < menorMedia) menorMedia = media;
+
+    for (const posicion of POSICIONES) {
+      if (cuenta[posicion] > mayorPorPosicion[posicion]) mayorPorPosicion[posicion] = cuenta[posicion];
+      if (cuenta[posicion] < menorPorPosicion[posicion]) menorPorPosicion[posicion] = cuenta[posicion];
+    }
   }
-  return mayor - menor;
+
+  let costo = mayorMedia - menorMedia;
+  if (usarPosiciones) {
+    for (const posicion of POSICIONES) {
+      costo += PESO_POSICIONES * (mayorPorPosicion[posicion] - menorPorPosicion[posicion]);
+    }
+  }
+  return costo;
 }
 
 
@@ -138,8 +225,17 @@ function guardarJugador(evento) {
     valores[atributo] = Number(document.getElementById(atributo).value);
   }
 
+  const posicion = document.getElementById("posicion").value;
+  const marcadas = leerSecundarias();
+  // Guardamos las secundarias siempre en el mismo orden y sin repetir la principal
+  const secundarias = POSICIONES.filter(p => marcadas.includes(p) && p !== posicion);
+
   if (nombre === "") {
     mostrarMensaje("mensajeJugador", "Poné un nombre.", "error");
+    return;
+  }
+  if (posicion === "") {
+    mostrarMensaje("mensajeJugador", "Elegí la posición principal.", "error");
     return;
   }
   for (const atributo of ATRIBUTOS) {
@@ -156,9 +252,11 @@ function guardarJugador(evento) {
     for (const atributo of ATRIBUTOS) {
       existente[atributo] = valores[atributo];
     }
+    existente.posicion = posicion;
+    existente.secundarias = secundarias;
     mostrarMensaje("mensajeJugador", "Actualizado: " + existente.nombre + ", media " + redondear(mediaJugador(existente)) + ".", "ok");
   } else {
-    const nuevo = { nombre: nombre, juega: true };
+    const nuevo = { nombre: nombre, posicion: posicion, secundarias: secundarias, juega: true };
     for (const atributo of ATRIBUTOS) {
       nuevo[atributo] = valores[atributo];
     }
@@ -167,6 +265,7 @@ function guardarJugador(evento) {
   }
 
   document.getElementById("formJugador").reset();
+  actualizarSecundarias();
   document.getElementById("nombre").focus();
   guardar();
   mostrarTodo();
@@ -179,8 +278,32 @@ function editarJugador(indice) {
   for (const atributo of ATRIBUTOS) {
     document.getElementById(atributo).value = jugador[atributo];
   }
-  mostrarMensaje("mensajeJugador", "Cambiá los números y tocá Guardar jugador.", "");
+  document.getElementById("posicion").value = jugador.posicion;
+  for (const casilla of document.querySelectorAll('input[name="secundaria"]')) {
+    casilla.checked = jugador.secundarias.includes(casilla.value);
+  }
+  actualizarSecundarias();
+  mostrarMensaje("mensajeJugador", "Cambiá lo que quieras y tocá Guardar jugador.", "");
   document.getElementById("ritmo").focus();
+}
+
+// Devuelve las posiciones secundarias tildadas en el formulario
+function leerSecundarias() {
+  const tildadas = document.querySelectorAll('input[name="secundaria"]:checked');
+  return [...tildadas].map(casilla => casilla.value);
+}
+
+// La posición principal no puede ser también secundaria: la destildamos y la bloqueamos
+function actualizarSecundarias() {
+  const principal = document.getElementById("posicion").value;
+  for (const casilla of document.querySelectorAll('input[name="secundaria"]')) {
+    if (casilla.value === principal) {
+      casilla.checked = false;
+      casilla.disabled = true;
+    } else {
+      casilla.disabled = false;
+    }
+  }
 }
 
 function borrarJugador(indice) {
@@ -205,7 +328,7 @@ function mostrarJugadores() {
   const tabla = document.getElementById("tablaJugadores");
 
   if (jugadores.length === 0) {
-    tabla.innerHTML = '<tr><td colspan="8">Todavía no cargaste jugadores.</td></tr>';
+    tabla.innerHTML = '<tr><td colspan="9">Todavía no cargaste jugadores.</td></tr>';
     return;
   }
 
@@ -215,6 +338,7 @@ function mostrarJugadores() {
       <tr>
         <td><input type="checkbox" ${jugador.juega ? "checked" : ""} onchange="cambiarJuega(${i}, this.checked)"></td>
         <td class="nombre">${escapar(jugador.nombre)}</td>
+        <td class="posicion">${textoPosiciones(jugador)}</td>
         <td>${jugador.ritmo}</td>
         <td>${jugador.pase}</td>
         <td>${jugador.regate}</td>
@@ -250,7 +374,7 @@ function repartirAlAzar(nombres, cantidad) {
   return grupos;
 }
 
-// Prueba cambiar jugadores de a dos entre equipos mientras las medias se acerquen
+// Prueba cambiar jugadores de a dos entre equipos mientras queden más parejos
 function mejorarConIntercambios(grupos) {
   let huboMejora = true;
   while (huboMejora) {
@@ -259,10 +383,10 @@ function mejorarConIntercambios(grupos) {
       for (let b = a + 1; b < grupos.length; b++) {
         for (let i = 0; i < grupos[a].length; i++) {
           for (let j = 0; j < grupos[b].length; j++) {
-            const antes = diferenciaRapida(grupos);
+            const antes = costoRapido(grupos);
             // Intercambiamos
             [grupos[a][i], grupos[b][j]] = [grupos[b][j], grupos[a][i]];
-            const despues = diferenciaRapida(grupos);
+            const despues = costoRapido(grupos);
             if (despues < antes - 0.0001) {
               huboMejora = true;
             } else {
@@ -297,12 +421,15 @@ function claveDe(grupos) {
 // Busca la combinación más pareja que todavía no se haya mostrado
 function buscarEquiposParejos(nombres, cantidad) {
   let mejor = null;
-  let mejorDiferencia = Infinity;
+  let mejorCosto = Infinity;
   const intentos = nombres.length > 30 ? 15 : 60;
 
   mediasGuardadas = {};
+  aportesGuardados = {};
   for (const nombre of nombres) {
-    mediasGuardadas[nombre] = mediaJugador(buscarJugador(nombre));
+    const jugador = buscarJugador(nombre);
+    mediasGuardadas[nombre] = mediaJugador(jugador);
+    aportesGuardados[nombre] = aportePorPosicion(jugador);
   }
 
   for (let intento = 0; intento < intentos; intento++) {
@@ -317,10 +444,10 @@ function buscarEquiposParejos(nombres, cantidad) {
     }
     if (combinacionesVistas.includes(claveDe(grupos))) continue;
 
-    const diferencia = diferenciaRapida(grupos);
-    if (diferencia < mejorDiferencia) {
+    const costo = costoRapido(grupos);
+    if (costo < mejorCosto) {
       mejor = grupos;
-      mejorDiferencia = diferencia;
+      mejorCosto = costo;
     }
   }
   return mejor;
@@ -356,15 +483,23 @@ function armarEquipos(esOtraCombinacion) {
     combinacionesVistas.push(claveDe(equipos.map(e => e.jugadores)));
   }
 
+  usarPosiciones = document.getElementById("usarPosiciones").checked;
   const grupos = buscarEquiposParejos(nombres, cantidad);
   if (grupos === null) {
     mostrarMensaje("mensajeEquipos", "No hay otra combinación distinta de las que ya viste.", "error");
     return;
   }
 
-  // Ordenamos cada equipo de mejor a peor jugador
+  // Ordenamos cada equipo por posición (arquero primero) y después de mejor a peor
   for (const grupo of grupos) {
-    grupo.sort((x, y) => mediaJugador(buscarJugador(y)) - mediaJugador(buscarJugador(x)));
+    grupo.sort((x, y) => {
+      const jx = buscarJugador(x);
+      const jy = buscarJugador(y);
+      const ordenX = jx.posicion ? POSICIONES.indexOf(jx.posicion) : POSICIONES.length;
+      const ordenY = jy.posicion ? POSICIONES.indexOf(jy.posicion) : POSICIONES.length;
+      if (ordenX !== ordenY) return ordenX - ordenY;
+      return mediaJugador(jy) - mediaJugador(jx);
+    });
   }
 
   equipos = grupos.map((grupo, i) => ({ nombre: "Equipo " + (i + 1), jugadores: grupo }));
@@ -438,9 +573,16 @@ function mostrarEquipos() {
       .map(a => NOMBRES_ATRIBUTOS[a] + " " + redondear(mediaGrupo(equipo.jugadores, a)))
       .join(" · ");
 
+    const cuenta = contarPosiciones(equipo.jugadores);
+    const posiciones = POSICIONES.map(p => cuenta[p] + " " + p).join(" · ");
+
     let aviso = "";
     if (equipo.jugadores.length < formatoActual) {
-      aviso = `<p class="mensaje error">Tiene ${equipo.jugadores.length} y F${formatoActual} pide ${formatoActual}.</p>`;
+      aviso += `<p class="mensaje error">Tiene ${equipo.jugadores.length} y F${formatoActual} pide ${formatoActual}.</p>`;
+    }
+    const hayPosicionesCargadas = jugadores.some(j => j.posicion);
+    if (hayPosicionesCargadas && !tieneArquero(equipo.jugadores)) {
+      aviso += `<p class="mensaje error">Nadie de este equipo juega de arquero.</p>`;
     }
 
     html += `
@@ -450,6 +592,7 @@ function mostrarEquipos() {
           <button class="chico secundario" onclick="renombrarEquipo(${e})">Renombrar</button>
         </h3>
         <div class="medias">${medias}</div>
+        <div class="medias">Posiciones: ${posiciones}</div>
         ${aviso}
         <ul>`;
 
@@ -461,7 +604,7 @@ function mostrarEquipos() {
       });
       html += `
           <li>
-            <span>${escapar(nombre)} (${redondear(mediaJugador(jugador))})</span>
+            <span>${escapar(nombre)} <span class="posicion">${textoPosiciones(jugador)}</span> (${redondear(mediaJugador(jugador))})</span>
             <select title="Mover a otro equipo" onchange="moverJugador(${e}, ${p}, this.value)">${opciones}</select>
           </li>`;
     });
@@ -672,6 +815,7 @@ function mostrarTodo() {
 }
 
 document.getElementById("formJugador").addEventListener("submit", guardarJugador);
+document.getElementById("posicion").addEventListener("change", actualizarSecundarias);
 document.getElementById("botonArmar").addEventListener("click", () => armarEquipos(false));
 document.getElementById("botonOtra").addEventListener("click", () => armarEquipos(true));
 document.getElementById("botonTorneo").addEventListener("click", armarTorneo);
