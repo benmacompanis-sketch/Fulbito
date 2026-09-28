@@ -285,6 +285,13 @@ td.nombre {
   font-size: 14px;
 }
 
+.cargando {
+  text-align: center;
+  color: #5b6b5d;
+  font-weight: bold;
+  padding: 40px 16px;
+}
+
 footer {
   text-align: center;
   color: #5b6b5d;

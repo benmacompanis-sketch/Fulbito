@@ -2,8 +2,12 @@
 
 Hay dos versiones que hacen lo mismo:
 
-- **Versión web** (`index.html`, `style.css`, `script.js`): se abre en el navegador,
-  también desde el celular. Publicada en https://benmacompanis-sketch.github.io/Fulbito/
+- **Versión web, hecha en Python** (`index.html`, `style.css`, `pagina.py`): se abre
+  en el navegador, también desde el celular. Publicada en
+  https://benmacompanis-sketch.github.io/Fulbito/
+  Toda la lógica está en `pagina.py`, que corre dentro del navegador gracias a
+  [PyScript](https://pyscript.net). La primera vez que se abre tarda unos segundos
+  en cargar Python; después queda en caché.
   Los datos quedan guardados en ese navegador.
   Además de los atributos, cada jugador tiene una posición principal (Arquero,
   Defensor, Mediocampista o Delantero) y las secundarias que quieras. Al armar
@@ -15,7 +19,18 @@ Hay dos versiones que hacen lo mismo:
   defensores, mediocampistas y delanteros según el puesto en que juegan.
 - **Versión de consola en Python** (`main.py` y la carpeta `futbol/`), explicada abajo.
 
-Para probar la versión web sin internet, abrí `index.html` con doble clic.
+### Probar la versión web en tu compu
+
+Con doble clic en `index.html` no anda: el navegador no deja que la página lea
+`pagina.py` desde un archivo suelto. Hay que abrirla con un servidor local, que
+ya viene con Python. En una terminal, dentro de la carpeta del proyecto:
+
+```bash
+python -m http.server
+```
+
+y abrí http://localhost:8000 en el navegador. Hace falta internet para bajar
+PyScript. Para cortar el servidor, `Ctrl + C` en la terminal.
 
 ## Versión de consola (Python)
 
