@@ -1,424 +1,79 @@
-# ===============================
-# Fulbito - Organizador de equipos
-# Versión web en Python (corre en el navegador con PyScript)
-# ===============================
+# ==========================================
+# pagina.py - Fulbito en la página web
+# ==========================================
+# Este archivo hace funcionar la página (index.html).
+# Corre dentro del navegador gracias a PyScript.
+# Las cuentas están en logica.py.
+#
+# En index.html cada botón dice qué función de acá llama. Por ejemplo:
+#     <button py-click="tocar_armar">
+# llama a la función tocar_armar cuando lo tocan.
+# Esas funciones reciben el "evento": ahí dice qué botón se tocó.
 
-import html
 import json
-import random
+from pyscript import document, window
+import logica
 
-from pyscript import document, when, window
-
-
-# ---------- DATOS ----------
-
-# Cada jugador es un diccionario:
-# {"nombre", "ritmo", "pase", "regate", "defensa", "posicion", "secundarias", "juega"}
-# "posicion" es la principal ("ARQ", "DEF", "MED" o "DEL") y "secundarias" es una lista.
-jugadores = []
-
-# Cada equipo: {"nombre": ..., "jugadores": [nombres de los jugadores]}
-equipos = []
-
-# Cada partido: {"fecha", "local", "visitante", "golesLocal", "golesVisitante"}
-# (las claves quedan como estaban para no perder lo que ya estaba guardado)
-partidos = []
-
-# Combinaciones de equipos que ya se mostraron, para no repetirlas
-combinaciones_vistas = []
-
-formato_actual = 5
-
-ATRIBUTOS = ["ritmo", "pase", "regate", "defensa"]
-NOMBRES_ATRIBUTOS = {"ritmo": "Ritmo", "pase": "Pase", "regate": "Regate", "defensa": "Defensa"}
-
-POSICIONES = ["ARQ", "DEF", "MED", "DEL"]
-
-# Cuánto pesa que las posiciones queden desparejas, comparado con la media.
-# Con 1, tener un delantero de más que otro equipo pesa igual que un punto de media.
-PESO_POSICIONES = 1
-
-# Si se tiene en cuenta la posición al armar equipos (lo cambia la casilla de la página)
-usar_posiciones = True
+# Acá está todo: jugadores, equipos y torneo
+datos = {
+    "jugadores": [],
+    "equipos": [],
+    "partidos": [],
+    "combinacionesVistas": [],
+    "formatoActual": 5,
+}
 
 
-# ---------- GUARDAR Y CARGAR (en el navegador) ----------
+# ---------- GUARDAR Y CARGAR ----------
+# Los datos se guardan en el navegador (en "localStorage") con el nombre "fulbito".
 
-def guardar():
-    datos = {
-        "jugadores": jugadores,
-        "equipos": equipos,
-        "partidos": partidos,
-        "combinacionesVistas": combinaciones_vistas,
-        "formatoActual": formato_actual,
-    }
-    try:
-        window.localStorage.setItem("fulbito", json.dumps(datos))
-    except Exception:
-        # Si el navegador no deja guardar, la página sigue andando igual
-        pass
+def guardar_datos():
+    window.localStorage.setItem("fulbito", json.dumps(datos))
 
 
-def cargar():
-    global jugadores, equipos, partidos, combinaciones_vistas, formato_actual
-    try:
-        texto = window.localStorage.getItem("fulbito")
-        if texto:
-            datos = json.loads(texto)
-            jugadores = datos.get("jugadores", [])
-            # Los jugadores cargados antes de que existieran las posiciones quedan sin posición
-            for jugador in jugadores:
-                if not jugador.get("posicion"):
-                    jugador["posicion"] = ""
-                if not isinstance(jugador.get("secundarias"), list):
-                    jugador["secundarias"] = []
-            equipos = datos.get("equipos", [])
-            partidos = datos.get("partidos", [])
-            combinaciones_vistas = datos.get("combinacionesVistas", [])
-            formato_actual = datos.get("formatoActual", 5)
-    except Exception:
-        # Si no se puede leer, arrancamos vacío
-        pass
+def cargar_datos():
+    texto = window.localStorage.getItem("fulbito")
+    # Si no había nada guardado, no hay texto
+    if not texto:
+        return
+    leidos = json.loads(texto)
+    logica.arreglar_datos(leidos)
+    datos["jugadores"] = leidos["jugadores"]
+    datos["equipos"] = leidos["equipos"]
+    datos["partidos"] = leidos["partidos"]
+    datos["combinacionesVistas"] = leidos["combinacionesVistas"]
+    datos["formatoActual"] = leidos["formatoActual"]
 
 
-# ---------- UTILIDADES ----------
+# ---------- COSAS CHICAS ----------
 
-# Evita que un nombre con símbolos raros rompa la página
+# Cambia los símbolos especiales para que un nombre como "<b>Juan</b>"
+# se vea tal cual y no rompa la página
 def escapar(texto):
-    return html.escape(str(texto), quote=True)
-
-
-def mismo_nombre(a, b):
-    return a.strip().lower() == b.strip().lower()
-
-
-def buscar_jugador(nombre):
-    for jugador in jugadores:
-        if mismo_nombre(jugador["nombre"], nombre):
-            return jugador
-    return None
-
-
-def redondear(numero):
-    return f"{numero:.1f}"
-
-
-# Convierte un texto en número entero. Si no es un entero, devuelve None.
-def leer_entero(texto):
-    try:
-        return int(texto.strip())
-    except ValueError:
-        return None
-
-
-def mostrar_mensaje(id_elemento, texto, tipo=""):
-    elemento = document.getElementById(id_elemento)
-    elemento.textContent = texto
-    elemento.className = "mensaje " + tipo
-
-
-# ---------- MEDIAS ----------
-
-# Media de un jugador: promedio de sus 4 atributos
-def media_jugador(jugador):
-    return (jugador["ritmo"] + jugador["pase"] + jugador["regate"] + jugador["defensa"]) / 4
-
-
-# Media de un grupo de nombres. Sin atributo: media general
-def media_grupo(nombres, atributo=None):
-    if len(nombres) == 0:
-        return 0
-    suma = 0
-    for nombre in nombres:
-        jugador = buscar_jugador(nombre)
-        if atributo:
-            suma += jugador[atributo]
-        else:
-            suma += media_jugador(jugador)
-    return suma / len(nombres)
-
-
-# Diferencia entre el equipo con mejor media y el de peor media
-def diferencia_de_medias(grupos):
-    medias = [media_grupo(grupo) for grupo in grupos]
-    return max(medias) - min(medias)
-
-
-# ---------- POSICIONES ----------
-
-# Texto corto para mostrar: "ARQ (DEF, MED)"
-def texto_posiciones(jugador):
-    if not jugador["posicion"]:
-        return "Sin posición"
-    texto = jugador["posicion"]
-    if len(jugador["secundarias"]) > 0:
-        texto += " (" + ", ".join(jugador["secundarias"]) + ")"
+    texto = str(texto)
+    texto = texto.replace("&", "&amp;")
+    texto = texto.replace("<", "&lt;")
+    texto = texto.replace(">", "&gt;")
+    texto = texto.replace('"', "&quot;")
+    texto = texto.replace("'", "&#39;")
     return texto
 
 
-# Cuánto aporta un jugador a cada posición: 1 la principal y 0,5 cada secundaria
-def aporte_por_posicion(jugador):
-    aporte = {"ARQ": 0, "DEF": 0, "MED": 0, "DEL": 0}
-    if jugador["posicion"]:
-        aporte[jugador["posicion"]] = 1
-    for posicion in jugador["secundarias"]:
-        if posicion != jugador["posicion"]:
-            aporte[posicion] = 0.5
-    return aporte
-
-
-# Decide en qué puesto juega cada jugador dentro de su equipo.
-# Devuelve algo como {"Pepe": "ARQ", "Tito": "DEF", ...}.
-#
-# 1. Todos arrancan en su posición principal.
-# 2. Si al equipo le falta un puesto (primero el arco, después defensa,
-#    medio y delantera), lo ocupa alguien que lo tenga de secundaria.
-#    Sale de su puesto el que deja menos hueco: el que tiene más
-#    compañeros en su posición; si empatan, el de menor media.
-#    Para el arco se acepta dejar otro puesto vacío; para los demás, no.
-def asignar_puestos(nombres):
-    puestos = {}
-    cuenta = {"ARQ": 0, "DEF": 0, "MED": 0, "DEL": 0}
-
-    for nombre in nombres:
-        jugador = buscar_jugador(nombre)
-        puestos[nombre] = jugador["posicion"]
-        if jugador["posicion"]:
-            cuenta[jugador["posicion"]] += 1
-
-    for puesto in POSICIONES:
-        if cuenta[puesto] > 0:
-            continue
-
-        elegido = None
-        for nombre in nombres:
-            jugador = buscar_jugador(nombre)
-            actual = puestos[nombre]
-            if puesto not in jugador["secundarias"]:
-                continue
-            if not actual:
-                continue
-            if puesto != "ARQ" and cuenta[actual] < 2:
-                continue
-
-            if elegido is None:
-                elegido = nombre
-            else:
-                companeros_nuevo = cuenta[actual]
-                companeros_elegido = cuenta[puestos[elegido]]
-                media_nuevo = media_jugador(jugador)
-                media_elegido = media_jugador(buscar_jugador(elegido))
-                if companeros_nuevo > companeros_elegido or (
-                    companeros_nuevo == companeros_elegido and media_nuevo < media_elegido
-                ):
-                    elegido = nombre
-
-        if elegido is not None:
-            cuenta[puestos[elegido]] -= 1
-            puestos[elegido] = puesto
-            cuenta[puesto] += 1
-
-    return puestos
-
-
-# Cuántos jugadores hay en cada puesto, según asignar_puestos
-def contar_puestos(puestos):
-    cuenta = {"ARQ": 0, "DEF": 0, "MED": 0, "DEL": 0}
-    for puesto in puestos.values():
-        if puesto:
-            cuenta[puesto] += 1
-    return cuenta
-
-
-# ---------- QUÉ TAN PAREJOS SON UNOS EQUIPOS ----------
-
-# Cuanto más bajo, más parejos. Suma:
-#  - la diferencia de media entre el mejor y el peor equipo
-#  - por cada posición, la diferencia entre el equipo que más tiene y el que menos
-#
-# No recibe los equipos sino las sumas de cada equipo, que se van actualizando
-# a medida que se prueban cambios. Así no hay que recalcular todo cada vez.
-def calcular_costo(suma_medias, suma_posiciones, tamanios):
-    medias = [suma_medias[t] / tamanios[t] for t in range(len(tamanios))]
-    costo = max(medias) - min(medias)
-    if usar_posiciones:
-        for posicion in POSICIONES:
-            valores = [suma_posiciones[t][posicion] for t in range(len(tamanios))]
-            costo += PESO_POSICIONES * (max(valores) - min(valores))
-    return costo
-
-
-def calcular_sumas(grupos, medias, aportes):
-    suma_medias = [sum(medias[n] for n in grupo) for grupo in grupos]
-    suma_posiciones = []
-    for grupo in grupos:
-        suma = {"ARQ": 0, "DEF": 0, "MED": 0, "DEL": 0}
-        for nombre in grupo:
-            for posicion in POSICIONES:
-                suma[posicion] += aportes[nombre][posicion]
-        suma_posiciones.append(suma)
-    tamanios = [len(grupo) for grupo in grupos]
-    return suma_medias, suma_posiciones, tamanios
-
-
-def costo_de(grupos, medias, aportes):
-    return calcular_costo(*calcular_sumas(grupos, medias, aportes))
-
-
-# ---------- ARMAR EQUIPOS PAREJOS ----------
-
-# Reparte los nombres en grupos, de a uno por equipo (como cuando se "pisa")
-def repartir_al_azar(nombres, cantidad):
-    mezclados = list(nombres)
-    random.shuffle(mezclados)
-    grupos = [[] for _ in range(cantidad)]
-    for i, nombre in enumerate(mezclados):
-        grupos[i % cantidad].append(nombre)
-    return grupos
-
-
-# Intercambia a "x" (del equipo a) con "y" (del equipo b) en las sumas
-def pasar_en_sumas(suma_medias, suma_posiciones, a, b, x, y, medias, aportes):
-    suma_medias[a] += medias[y] - medias[x]
-    suma_medias[b] += medias[x] - medias[y]
-    for posicion in POSICIONES:
-        suma_posiciones[a][posicion] += aportes[y][posicion] - aportes[x][posicion]
-        suma_posiciones[b][posicion] += aportes[x][posicion] - aportes[y][posicion]
-
-
-# Prueba cambiar jugadores de a dos entre equipos mientras queden más parejos
-def mejorar_con_intercambios(grupos, medias, aportes):
-    suma_medias, suma_posiciones, tamanios = calcular_sumas(grupos, medias, aportes)
-    actual = calcular_costo(suma_medias, suma_posiciones, tamanios)
-
-    hubo_mejora = True
-    while hubo_mejora:
-        hubo_mejora = False
-        for a in range(len(grupos)):
-            for b in range(a + 1, len(grupos)):
-                for i in range(len(grupos[a])):
-                    for j in range(len(grupos[b])):
-                        x = grupos[a][i]
-                        y = grupos[b][j]
-                        # Probamos el cambio
-                        pasar_en_sumas(suma_medias, suma_posiciones, a, b, x, y, medias, aportes)
-                        nuevo = calcular_costo(suma_medias, suma_posiciones, tamanios)
-                        if nuevo < actual - 0.0001:
-                            grupos[a][i], grupos[b][j] = y, x
-                            actual = nuevo
-                            hubo_mejora = True
-                        else:
-                            # No mejoró: lo volvemos atrás
-                            pasar_en_sumas(suma_medias, suma_posiciones, a, b, y, x, medias, aportes)
-
-
-# Cambia dos jugadores al azar de dos equipos distintos
-def intercambio_al_azar(grupos):
-    a, b = random.sample(range(len(grupos)), 2)
-    i = random.randrange(len(grupos[a]))
-    j = random.randrange(len(grupos[b]))
-    grupos[a][i], grupos[b][j] = grupos[b][j], grupos[a][i]
-
-
-# Texto que identifica una combinación sin importar el orden
-def clave_de(grupos):
-    partes = [",".join(sorted(n.lower() for n in grupo)) for grupo in grupos]
-    return " | ".join(sorted(partes))
-
-
-# Busca la combinación más pareja que todavía no se haya mostrado
-def buscar_equipos_parejos(nombres, cantidad):
-    medias = {}
-    aportes = {}
-    for nombre in nombres:
-        jugador = buscar_jugador(nombre)
-        medias[nombre] = media_jugador(jugador)
-        aportes[nombre] = aporte_por_posicion(jugador)
-
-    mejor = None
-    mejor_costo = float("inf")
-    intentos = 15 if len(nombres) > 30 else 40
-
-    for _ in range(intentos):
-        grupos = repartir_al_azar(nombres, cantidad)
-        mejorar_con_intercambios(grupos, medias, aportes)
-
-        # Si esta ya salió antes, la movemos un poco hasta encontrar una nueva
-        vueltas = 0
-        while clave_de(grupos) in combinaciones_vistas and vueltas < 50:
-            intercambio_al_azar(grupos)
-            vueltas += 1
-        if clave_de(grupos) in combinaciones_vistas:
-            continue
-
-        costo = costo_de(grupos, medias, aportes)
-        if costo < mejor_costo:
-            mejor = grupos
-            mejor_costo = costo
-
-    return mejor
-
-
-def armar_equipos(es_otra_combinacion):
-    global equipos, partidos, combinaciones_vistas, formato_actual, usar_posiciones
-
-    formato = int(document.getElementById("formato").value)
-    cantidad = leer_entero(document.getElementById("cantidadEquipos").value)
-    nombres = [j["nombre"] for j in jugadores if j["juega"]]
-
-    if cantidad is None or cantidad < 2:
-        mostrar_mensaje("mensajeEquipos", "Tienen que ser al menos 2 equipos.", "error")
-        return
-
-    necesarios = formato * cantidad
-    if len(nombres) < necesarios:
-        faltan = necesarios - len(nombres)
-        mostrar_mensaje(
-            "mensajeEquipos",
-            f"Faltan {faltan} jugador(es): para {cantidad} equipos de F{formato} "
-            f"se necesitan {necesarios} y juegan {len(nombres)}. No inventamos jugadores.",
-            "error",
-        )
-        return
-
-    if len(partidos) > 0 and not window.confirm(
-        "Hay un torneo armado. Si cambiás los equipos se borra el torneo. ¿Seguir?"
-    ):
-        return
-
-    # "Armar" empieza de cero; "Otra combinación" no repite las ya mostradas
-    if not es_otra_combinacion or len(equipos) == 0:
-        combinaciones_vistas = []
-    else:
-        combinaciones_vistas.append(clave_de([e["jugadores"] for e in equipos]))
-
-    usar_posiciones = document.getElementById("usarPosiciones").checked
-    grupos = buscar_equipos_parejos(nombres, cantidad)
-    if grupos is None:
-        mostrar_mensaje("mensajeEquipos", "No hay otra combinación distinta de las que ya viste.", "error")
-        return
-
-    equipos = [{"nombre": f"Equipo {i + 1}", "jugadores": grupo} for i, grupo in enumerate(grupos)]
-    formato_actual = formato
-    partidos = []
-
-    sobran = len(nombres) - necesarios
-    texto = "¡Equipos armados!"
-    if sobran > 0:
-        texto += f" Sobran {sobran} jugador(es) para F{formato}: quedan como suplentes."
-    mostrar_mensaje("mensajeEquipos", texto, "ok")
-    mostrar_mensaje("mensajeTorneo", "")
-
-    guardar()
-    mostrar_todo()
+# Muestra un mensaje. "tipo" es "ok" (verde), "error" (rojo) o "" (normal).
+def mostrar_mensaje(id_mensaje, texto, tipo):
+    mensaje = document.getElementById(id_mensaje)
+    mensaje.textContent = texto
+    mensaje.className = "mensaje " + tipo
 
 
 # ---------- JUGADORES ----------
 
-# Devuelve las posiciones secundarias tildadas en el formulario
 def leer_secundarias():
-    tildadas = document.querySelectorAll('input[name="secundaria"]:checked')
-    return [casilla.value for casilla in tildadas]
+    secundarias = []
+    for casilla in document.querySelectorAll('input[name="secundaria"]'):
+        if casilla.checked:
+            secundarias.append(casilla.value)
+    return secundarias
 
 
 # La posición principal no puede ser también secundaria: la destildamos y la bloqueamos
@@ -432,433 +87,412 @@ def actualizar_secundarias():
             casilla.disabled = False
 
 
-def guardar_jugador():
+def tocar_posicion(evento):
+    actualizar_secundarias()
+
+
+def tocar_guardar_jugador(evento):
     nombre = document.getElementById("nombre").value.strip()
-    valores = {}
-    for atributo in ATRIBUTOS:
-        valores[atributo] = leer_entero(document.getElementById(atributo).value)
-
+    numeros = {}
+    for atributo in logica.ATRIBUTOS:
+        numeros[atributo] = logica.convertir_numero(document.getElementById(atributo).value)
     posicion = document.getElementById("posicion").value
-    marcadas = leer_secundarias()
-    # Guardamos las secundarias siempre en el mismo orden y sin repetir la principal
-    secundarias = [p for p in POSICIONES if p in marcadas and p != posicion]
+    secundarias = leer_secundarias()
 
-    if nombre == "":
-        mostrar_mensaje("mensajeJugador", "Poné un nombre.", "error")
+    error = logica.revisar_jugador(nombre, numeros, posicion)
+    if error != "":
+        mostrar_mensaje("mensajeJugador", error, "error")
         return
-    if posicion == "":
-        mostrar_mensaje("mensajeJugador", "Elegí la posición principal.", "error")
-        return
-    for atributo in ATRIBUTOS:
-        valor = valores[atributo]
-        if valor is None or valor < 1 or valor > 99:
-            mostrar_mensaje(
-                "mensajeJugador",
-                NOMBRES_ATRIBUTOS[atributo] + " tiene que ser un número entero del 1 al 99.",
-                "error",
-            )
-            return
 
-    existente = buscar_jugador(nombre)
-    if existente:
-        # Si ya existe, actualizamos sus datos
-        for atributo in ATRIBUTOS:
-            existente[atributo] = valores[atributo]
-        existente["posicion"] = posicion
-        existente["secundarias"] = secundarias
-        mostrar_mensaje(
-            "mensajeJugador",
-            f"Actualizado: {existente['nombre']}, media {redondear(media_jugador(existente))}.",
-            "ok",
-        )
+    es_nuevo = logica.guardar_jugador(datos["jugadores"], nombre, numeros, posicion, secundarias)
+    jugador = logica.buscar_jugador(datos["jugadores"], nombre)
+    media = logica.redondear(logica.media_jugador(jugador))
+    if es_nuevo:
+        mostrar_mensaje("mensajeJugador", "Listo: " + jugador["nombre"] + ", media " + media + ".", "ok")
     else:
-        nuevo = {"nombre": nombre, "posicion": posicion, "secundarias": secundarias, "juega": True}
-        for atributo in ATRIBUTOS:
-            nuevo[atributo] = valores[atributo]
-        jugadores.append(nuevo)
-        mostrar_mensaje("mensajeJugador", f"Listo: {nombre}, media {redondear(media_jugador(nuevo))}.", "ok")
+        mostrar_mensaje("mensajeJugador", "Actualizado: " + jugador["nombre"] + ", media " + media + ".", "ok")
 
+    # Dejamos el formulario vacío para cargar otro
     document.getElementById("formJugador").reset()
     actualizar_secundarias()
     document.getElementById("nombre").focus()
-    guardar()
+    guardar_datos()
     mostrar_todo()
 
 
 # Pone los datos de un jugador en el formulario para cambiarlos
-def editar_jugador(indice):
-    jugador = jugadores[indice]
+def tocar_editar(evento):
+    indice = int(evento.target.getAttribute("data-indice"))
+    jugador = datos["jugadores"][indice]
+
     document.getElementById("nombre").value = jugador["nombre"]
-    for atributo in ATRIBUTOS:
+    for atributo in logica.ATRIBUTOS:
         document.getElementById(atributo).value = str(jugador[atributo])
     document.getElementById("posicion").value = jugador["posicion"]
     for casilla in document.querySelectorAll('input[name="secundaria"]'):
         casilla.checked = casilla.value in jugador["secundarias"]
     actualizar_secundarias()
-    mostrar_mensaje("mensajeJugador", "Cambiá lo que quieras y tocá Guardar jugador.")
+
+    mostrar_mensaje("mensajeJugador", "Cambiá lo que quieras y tocá Guardar jugador.", "")
     document.getElementById("ritmo").focus()
 
 
-def borrar_jugador(indice):
-    jugador = jugadores[indice]
-    esta_en_un_equipo = any(
-        mismo_nombre(nombre, jugador["nombre"]) for equipo in equipos for nombre in equipo["jugadores"]
-    )
-    if esta_en_un_equipo:
-        mostrar_mensaje(
-            "mensajeJugador",
-            jugador["nombre"] + " está en un equipo. Sacalo del equipo o armá equipos nuevos antes de borrarlo.",
-            "error",
-        )
+def tocar_borrar(evento):
+    indice = int(evento.target.getAttribute("data-indice"))
+    jugador = datos["jugadores"][indice]
+
+    if logica.esta_en_un_equipo(datos["equipos"], jugador["nombre"]):
+        mostrar_mensaje("mensajeJugador", jugador["nombre"] + " está en un equipo. Armá equipos nuevos antes de borrarlo.", "error")
         return
     if not window.confirm("¿Borrar a " + jugador["nombre"] + "?"):
         return
-    jugadores.pop(indice)
-    guardar()
+
+    datos["jugadores"].pop(indice)
+    guardar_datos()
     mostrar_todo()
 
 
-def cambiar_juega(indice, valor):
-    jugadores[indice]["juega"] = valor
-    guardar()
+# Tildar o destildar "Juega"
+def tocar_juega(evento):
+    indice = int(evento.target.getAttribute("data-indice"))
+    datos["jugadores"][indice]["juega"] = evento.target.checked
+    guardar_datos()
 
 
 def mostrar_jugadores():
     tabla = document.getElementById("tablaJugadores")
-
-    if len(jugadores) == 0:
+    if len(datos["jugadores"]) == 0:
         tabla.innerHTML = '<tr><td colspan="9">Todavía no cargaste jugadores.</td></tr>'
         return
 
     filas = ""
-    for i, jugador in enumerate(jugadores):
-        tildado = "checked" if jugador["juega"] else ""
-        filas += f"""
-          <tr>
-            <td><input type="checkbox" {tildado} data-accion="juega" data-indice="{i}"></td>
-            <td class="nombre">{escapar(jugador["nombre"])}</td>
-            <td class="posicion">{texto_posiciones(jugador)}</td>
-            <td>{jugador["ritmo"]}</td>
-            <td>{jugador["pase"]}</td>
-            <td>{jugador["regate"]}</td>
-            <td>{jugador["defensa"]}</td>
-            <td><b>{redondear(media_jugador(jugador))}</b></td>
-            <td>
-              <button class="chico secundario" data-accion="editar" data-indice="{i}">Editar</button>
-              <button class="chico peligro" data-accion="borrar" data-indice="{i}">Borrar</button>
-            </td>
-          </tr>"""
+    for i in range(len(datos["jugadores"])):
+        jugador = datos["jugadores"][i]
+        tildado = ""
+        if jugador["juega"]:
+            tildado = "checked"
+
+        filas = filas + "<tr>"
+        filas = filas + '<td><input type="checkbox" ' + tildado + ' py-change="tocar_juega" data-indice="' + str(i) + '"></td>'
+        filas = filas + '<td class="nombre">' + escapar(jugador["nombre"]) + "</td>"
+        filas = filas + '<td class="posicion">' + logica.texto_posiciones(jugador) + "</td>"
+        for atributo in logica.ATRIBUTOS:
+            filas = filas + "<td>" + str(jugador[atributo]) + "</td>"
+        filas = filas + "<td><b>" + logica.redondear(logica.media_jugador(jugador)) + "</b></td>"
+        filas = filas + "<td>"
+        filas = filas + '<button class="chico secundario" py-click="tocar_editar" data-indice="' + str(i) + '">Editar</button> '
+        filas = filas + '<button class="chico peligro" py-click="tocar_borrar" data-indice="' + str(i) + '">Borrar</button>'
+        filas = filas + "</td>"
+        filas = filas + "</tr>"
     tabla.innerHTML = filas
 
 
-# ---------- MODIFICAR EQUIPOS A MANO ----------
+# ---------- EQUIPOS ----------
 
-def mover_jugador(equipo_origen, lugar, equipo_destino):
-    if equipo_destino == equipo_origen:
+def tocar_armar(evento):
+    armar(False)
+
+
+def tocar_otra(evento):
+    armar(True)
+
+
+# Arma equipos parejos. Si "es_otra" es True, no repite las combinaciones que ya salieron.
+def armar(es_otra):
+    formato = int(document.getElementById("formato").value)
+    cantidad = logica.convertir_numero(document.getElementById("cantidadEquipos").value)
+    usar_posiciones = document.getElementById("usarPosiciones").checked
+
+    if cantidad == None or cantidad < 2:
+        mostrar_mensaje("mensajeEquipos", "Tienen que ser al menos 2 equipos.", "error")
         return
 
-    if len(equipos[equipo_origen]["jugadores"]) == 1:
+    juegan = []
+    for jugador in datos["jugadores"]:
+        if jugador["juega"]:
+            juegan.append(jugador)
+
+    necesarios = formato * cantidad
+    if len(juegan) < necesarios:
+        faltan = necesarios - len(juegan)
+        texto = "Faltan " + str(faltan) + " jugador(es): para " + str(cantidad) + " equipos de F" + str(formato)
+        texto = texto + " se necesitan " + str(necesarios) + " y juegan " + str(len(juegan)) + ". No inventamos jugadores."
+        mostrar_mensaje("mensajeEquipos", texto, "error")
+        return
+
+    if len(datos["partidos"]) > 0:
+        if not window.confirm("Hay un torneo armado. Si cambiás los equipos se borra el torneo. ¿Seguir?"):
+            return
+
+    # "Armar" empieza de cero. "Otra combinación" agrega la actual a las ya vistas.
+    if es_otra and len(datos["equipos"]) > 0:
+        datos["combinacionesVistas"].append(logica.clave_de_equipos(datos["equipos"]))
+    else:
+        datos["combinacionesVistas"] = []
+
+    equipos = logica.armar_equipos(juegan, cantidad, usar_posiciones, datos["combinacionesVistas"])
+    if equipos == None:
+        mostrar_mensaje("mensajeEquipos", "No hay otra combinación distinta de las que ya viste.", "error")
+        return
+
+    datos["equipos"] = equipos
+    datos["formatoActual"] = formato
+    datos["partidos"] = []
+
+    texto = "¡Equipos armados!"
+    sobran = len(juegan) - necesarios
+    if sobran > 0:
+        texto = texto + " Sobran " + str(sobran) + " jugador(es) para F" + str(formato) + ": quedan como suplentes."
+    mostrar_mensaje("mensajeEquipos", texto, "ok")
+    mostrar_mensaje("mensajeTorneo", "", "")
+    guardar_datos()
+    mostrar_todo()
+
+
+# Cuando eligen otro equipo en la lista que está al lado de cada jugador
+def tocar_mover(evento):
+    nombre = evento.target.getAttribute("data-nombre")
+    destino = int(evento.target.value)
+
+    if logica.mover_jugador(datos["equipos"], nombre, destino):
+        mostrar_mensaje("mensajeEquipos", nombre + " pasó a " + datos["equipos"][destino]["nombre"] + ".", "ok")
+        guardar_datos()
+    else:
         mostrar_mensaje("mensajeEquipos", "No podés dejar un equipo sin jugadores.", "error")
-        mostrar_equipos()
-        return
-
-    nombre = equipos[equipo_origen]["jugadores"].pop(lugar)
-    equipos[equipo_destino]["jugadores"].append(nombre)
-    mostrar_mensaje("mensajeEquipos", f"{nombre} pasó a {equipos[equipo_destino]['nombre']}.", "ok")
-    guardar()
     mostrar_todo()
 
 
-def renombrar_equipo(indice):
-    viejo = equipos[indice]["nombre"]
+def tocar_renombrar(evento):
+    indice = int(evento.target.getAttribute("data-equipo"))
+    viejo = datos["equipos"][indice]["nombre"]
     nuevo = window.prompt("Nombre nuevo para " + viejo + ":", viejo)
-    if not nuevo or nuevo.strip() == "":
-        return
-    nuevo = nuevo.strip()
 
-    repetido = any(i != indice and mismo_nombre(e["nombre"], nuevo) for i, e in enumerate(equipos))
-    if repetido:
+    # Si tocan "Cancelar" o lo dejan vacío, no hacemos nada
+    if not nuevo:
+        return
+    if nuevo.strip() == "":
+        return
+
+    if logica.renombrar_equipo(datos["equipos"], datos["partidos"], indice, nuevo):
+        guardar_datos()
+        mostrar_todo()
+    else:
         mostrar_mensaje("mensajeEquipos", "Ya hay un equipo con ese nombre.", "error")
-        return
-
-    equipos[indice]["nombre"] = nuevo
-    # También lo cambiamos en el fixture
-    for partido in partidos:
-        if partido["local"] == viejo:
-            partido["local"] = nuevo
-        if partido["visitante"] == viejo:
-            partido["visitante"] = nuevo
-    guardar()
-    mostrar_todo()
 
 
 def mostrar_equipos():
     contenedor = document.getElementById("equipos")
     resumen = document.getElementById("resumenEquipos")
+    equipos = datos["equipos"]
 
     if len(equipos) == 0:
         contenedor.innerHTML = "<p>Todavía no armaste equipos.</p>"
         resumen.textContent = ""
         return
 
-    hay_posiciones_cargadas = any(j["posicion"] for j in jugadores)
-    tarjetas = ""
-    for e, equipo in enumerate(equipos):
-        medias = " · ".join(
-            NOMBRES_ATRIBUTOS[a] + " " + redondear(media_grupo(equipo["jugadores"], a)) for a in ATRIBUTOS
-        )
+    # Solo avisamos de arqueros si hay jugadores con posición cargada
+    hay_posiciones = False
+    for jugador in datos["jugadores"]:
+        if jugador["posicion"] != "":
+            hay_posiciones = True
 
-        puestos = asignar_puestos(equipo["jugadores"])
-        cuenta = contar_puestos(puestos)
-        posiciones = " · ".join(f"{cuenta[p]} {p}" for p in POSICIONES)
+    texto = ""
+    for e in range(len(equipos)):
+        equipo = equipos[e]
+        lista = logica.jugadores_del_equipo(datos["jugadores"], equipo)
+        puestos = logica.asignar_puestos(lista)
+        cuenta = logica.contar_puestos(puestos)
+        media = logica.redondear(logica.media_de_lista(lista, ""))
 
-        aviso = ""
-        if len(equipo["jugadores"]) < formato_actual:
-            aviso += (
-                f'<p class="mensaje error">Tiene {len(equipo["jugadores"])} '
-                f"y F{formato_actual} pide {formato_actual}.</p>"
-            )
-        if hay_posiciones_cargadas and cuenta["ARQ"] == 0:
-            aviso += '<p class="mensaje error">Nadie de este equipo juega de arquero.</p>'
+        medias = ""
+        for atributo in logica.ATRIBUTOS:
+            if medias != "":
+                medias = medias + " · "
+            medias = medias + logica.NOMBRES_ATRIBUTOS[atributo] + " "
+            medias = medias + logica.redondear(logica.media_de_lista(lista, atributo))
 
-        tarjetas += f"""
-          <div class="equipo">
-            <h3>
-              <span>{escapar(equipo["nombre"])} — {redondear(media_grupo(equipo["jugadores"]))}</span>
-              <button class="chico secundario" data-accion="renombrar" data-equipo="{e}">Renombrar</button>
-            </h3>
-            <div class="medias">{medias}</div>
-            <div class="medias">Posiciones: {posiciones}</div>
-            {aviso}
-            <ul>"""
+        posiciones = ""
+        for posicion in logica.POSICIONES:
+            if posiciones != "":
+                posiciones = posiciones + " · "
+            posiciones = posiciones + str(cuenta[posicion]) + " " + posicion
 
-        # Los mostramos por el puesto en que juegan (arquero, defensores, medios,
-        # delanteros) y dentro de cada puesto de mejor a peor. Guardamos el lugar
-        # original en la lista para poder moverlos a otro equipo.
-        def orden_para_mostrar(par):
-            lugar, nombre = par
-            puesto = puestos[nombre]
-            numero_de_puesto = POSICIONES.index(puesto) if puesto else len(POSICIONES)
-            return (numero_de_puesto, -media_jugador(buscar_jugador(nombre)))
+        texto = texto + '<div class="equipo">'
+        texto = texto + "<h3><span>" + escapar(equipo["nombre"]) + " — " + media + "</span>"
+        texto = texto + '<button class="chico secundario" py-click="tocar_renombrar" data-equipo="' + str(e) + '">Renombrar</button></h3>'
+        texto = texto + '<div class="medias">' + medias + "</div>"
+        texto = texto + '<div class="medias">Posiciones: ' + posiciones + "</div>"
 
-        orden = sorted(enumerate(equipo["jugadores"]), key=orden_para_mostrar)
+        if len(lista) < datos["formatoActual"]:
+            formato = str(datos["formatoActual"])
+            texto = texto + '<p class="mensaje error">Tiene ' + str(len(lista)) + " y F" + formato + " pide " + formato + ".</p>"
+        if hay_posiciones and cuenta["ARQ"] == 0:
+            texto = texto + '<p class="mensaje error">Nadie de este equipo juega de arquero.</p>'
 
-        for lugar, nombre in orden:
-            jugador = buscar_jugador(nombre)
-            puesto = puestos[nombre]
+        texto = texto + "<ul>"
+        for jugador in logica.ordenar_para_mostrar(lista, puestos):
+            puesto = puestos[jugador["nombre"]]
 
-            # Si juega de una posición secundaria, el cartelito se ve distinto
+            # El cartelito con el puesto: lleno si es su posición principal,
+            # blanco si juega de una posición secundaria
             cartel = ""
             if puesto == jugador["posicion"]:
-                cartel = f'<span class="puesto">{puesto}</span>'
-            elif puesto:
-                cartel = f'<span class="puesto cambiado" title="Juega de su posición secundaria">{puesto}</span>'
+                cartel = '<span class="puesto">' + puesto + "</span>"
+            elif puesto != "":
+                cartel = '<span class="puesto cambiado" title="Juega de su posición secundaria">' + puesto + "</span>"
 
+            # Lista para mover al jugador a otro equipo
             opciones = ""
-            for o, otro in enumerate(equipos):
-                elegido = "selected" if o == e else ""
-                opciones += f'<option value="{o}" {elegido}>{escapar(otro["nombre"])}</option>'
+            for o in range(len(equipos)):
+                elegido = ""
+                if o == e:
+                    elegido = "selected"
+                opciones = opciones + '<option value="' + str(o) + '" ' + elegido + ">" + escapar(equipos[o]["nombre"]) + "</option>"
 
-            tarjetas += f"""
-              <li>
-                <span>{cartel} {escapar(nombre)} <span class="posicion">{texto_posiciones(jugador)}</span> ({redondear(media_jugador(jugador))})</span>
-                <select title="Mover a otro equipo" data-accion="mover" data-equipo="{e}" data-lugar="{lugar}">{opciones}</select>
-              </li>"""
+            texto = texto + "<li><span>" + cartel + " " + escapar(jugador["nombre"])
+            texto = texto + ' <span class="posicion">' + logica.texto_posiciones(jugador) + "</span>"
+            texto = texto + " (" + logica.redondear(logica.media_jugador(jugador)) + ")</span>"
+            texto = texto + '<select title="Mover a otro equipo" py-change="tocar_mover" data-nombre="' + escapar(jugador["nombre"]) + '">'
+            texto = texto + opciones + "</select></li>"
+        texto = texto + "</ul></div>"
 
-        tarjetas += """
-            </ul>
-          </div>"""
-    contenedor.innerHTML = tarjetas
+    contenedor.innerHTML = texto
 
-    medias_equipos = [media_grupo(e["jugadores"]) for e in equipos]
-    promedio = sum(medias_equipos) / len(medias_equipos)
-    diferencia = diferencia_de_medias([e["jugadores"] for e in equipos])
-    resumen.textContent = (
-        f"Promedio de las medias: {redondear(promedio)} · "
-        f"Diferencia entre el más fuerte y el más débil: {diferencia:.2f}"
-    )
+    promedio = logica.promedio_de_equipos(datos["jugadores"], equipos)
+    diferencia = logica.diferencia_entre_equipos(datos["jugadores"], equipos)
+    texto = "Promedio de las medias: " + logica.redondear(promedio)
+    texto = texto + " · Diferencia entre el más fuerte y el más débil: " + str(round(diferencia, 2))
+    resumen.textContent = texto
 
 
 # ---------- TORNEO ----------
 
-# Fixture todos contra todos (método del círculo)
-def crear_fixture(nombres_equipos, ida_y_vuelta):
-    lista = list(nombres_equipos)
-    if len(lista) % 2 == 1:
-        lista.append(None)  # None = fecha libre
-
-    total = len(lista)
-    resultado = []
-
-    for fecha in range(total - 1):
-        for k in range(total // 2):
-            local = lista[k]
-            visitante = lista[total - 1 - k]
-            if local is None or visitante is None:
-                continue
-            # Alternamos la localía del primer partido
-            if fecha % 2 == 1 and k == 0:
-                local, visitante = visitante, local
-            resultado.append(
-                {"fecha": fecha + 1, "local": local, "visitante": visitante, "golesLocal": None, "golesVisitante": None}
-            )
-        # Rotamos todos menos el primero
-        lista.insert(1, lista.pop())
-
-    if ida_y_vuelta:
-        fechas_ida = total - 1
-        vuelta = []
-        for p in resultado:
-            vuelta.append({
-                "fecha": p["fecha"] + fechas_ida,
-                "local": p["visitante"],
-                "visitante": p["local"],
-                "golesLocal": None,
-                "golesVisitante": None,
-            })
-        resultado += vuelta
-    return resultado
+def nombres_de_equipos():
+    nombres = []
+    for equipo in datos["equipos"]:
+        nombres.append(equipo["nombre"])
+    return nombres
 
 
-def armar_torneo():
-    global partidos
-    if len(equipos) < 2:
+def tocar_torneo(evento):
+    if len(datos["equipos"]) < 2:
         mostrar_mensaje("mensajeTorneo", "Primero armá al menos 2 equipos.", "error")
         return
-    if len(partidos) > 0 and not window.confirm("Ya hay un torneo. Si armás otro se borran los resultados. ¿Seguir?"):
-        return
+    if len(datos["partidos"]) > 0:
+        if not window.confirm("Ya hay un torneo. Si armás otro se borran los resultados. ¿Seguir?"):
+            return
+
     ida_y_vuelta = document.getElementById("idaYVuelta").checked
-    partidos = crear_fixture([e["nombre"] for e in equipos], ida_y_vuelta)
-    mostrar_mensaje("mensajeTorneo", f"Torneo armado: {len(partidos)} partidos.", "ok")
-    guardar()
+    datos["partidos"] = logica.crear_fixture(nombres_de_equipos(), ida_y_vuelta)
+    mostrar_mensaje("mensajeTorneo", "Torneo armado: " + str(len(datos["partidos"])) + " partidos.", "ok")
+    guardar_datos()
     mostrar_todo()
 
 
-def guardar_resultado(indice):
-    texto_local = document.getElementById(f"local{indice}").value.strip()
-    texto_visitante = document.getElementById(f"visitante{indice}").value.strip()
+def tocar_guardar_resultado(evento):
+    indice = int(evento.target.getAttribute("data-partido"))
+    partido = datos["partidos"][indice]
+    texto_local = document.getElementById("local" + str(indice)).value.strip()
+    texto_visitante = document.getElementById("visitante" + str(indice)).value.strip()
 
-    # Si borrás los dos, el partido vuelve a "sin jugar"
+    # Si borran los dos, el partido vuelve a "sin jugar"
     if texto_local == "" and texto_visitante == "":
-        partidos[indice]["golesLocal"] = None
-        partidos[indice]["golesVisitante"] = None
+        partido["golesLocal"] = None
+        partido["golesVisitante"] = None
     else:
-        goles_local = leer_entero(texto_local)
-        goles_visitante = leer_entero(texto_visitante)
-        if goles_local is None or goles_visitante is None or goles_local < 0 or goles_visitante < 0:
+        goles_local = logica.convertir_numero(texto_local)
+        goles_visitante = logica.convertir_numero(texto_visitante)
+        if goles_local == None or goles_visitante == None:
             mostrar_mensaje("mensajeTorneo", "Los goles tienen que ser números enteros desde 0.", "error")
             return
-        partidos[indice]["golesLocal"] = goles_local
-        partidos[indice]["golesVisitante"] = goles_visitante
+        partido["golesLocal"] = goles_local
+        partido["golesVisitante"] = goles_visitante
 
     mostrar_mensaje("mensajeTorneo", "Resultado guardado.", "ok")
-    guardar()
+    guardar_datos()
     mostrar_todo()
 
 
 def mostrar_fixture():
     contenedor = document.getElementById("fixture")
+    partidos = datos["partidos"]
     if len(partidos) == 0:
         contenedor.innerHTML = "<p>Todavía no armaste un torneo.</p>"
         return
 
-    ultima_fecha = max(p["fecha"] for p in partidos)
     texto = ""
-    for fecha in range(1, ultima_fecha + 1):
-        texto += f'<div class="fecha"><h4>Fecha {fecha}</h4>'
-        juegan = []
-        for i, p in enumerate(partidos):
-            if p["fecha"] != fecha:
+    for fecha in range(1, logica.ultima_fecha(partidos) + 1):
+        texto = texto + '<div class="fecha"><h4>Fecha ' + str(fecha) + "</h4>"
+        for i in range(len(partidos)):
+            partido = partidos[i]
+            if partido["fecha"] != fecha:
                 continue
-            juegan += [p["local"], p["visitante"]]
-            gl = "" if p["golesLocal"] is None else p["golesLocal"]
-            gv = "" if p["golesVisitante"] is None else p["golesVisitante"]
-            texto += f"""
-              <div class="partido">
-                <span>{escapar(p["local"])}</span>
-                <input type="number" min="0" id="local{i}" value="{gl}">
-                <span>-</span>
-                <input type="number" min="0" id="visitante{i}" value="{gv}">
-                <span>{escapar(p["visitante"])}</span>
-                <button class="chico" data-accion="resultado" data-partido="{i}">Guardar</button>
-              </div>"""
-        libres = [e["nombre"] for e in equipos if e["nombre"] not in juegan]
+
+            goles_local = ""
+            goles_visitante = ""
+            if partido["golesLocal"] != None:
+                goles_local = str(partido["golesLocal"])
+                goles_visitante = str(partido["golesVisitante"])
+
+            texto = texto + '<div class="partido">'
+            texto = texto + "<span>" + escapar(partido["local"]) + "</span>"
+            texto = texto + '<input type="number" min="0" id="local' + str(i) + '" value="' + goles_local + '">'
+            texto = texto + "<span>-</span>"
+            texto = texto + '<input type="number" min="0" id="visitante' + str(i) + '" value="' + goles_visitante + '">'
+            texto = texto + "<span>" + escapar(partido["visitante"]) + "</span>"
+            texto = texto + '<button class="chico" py-click="tocar_guardar_resultado" data-partido="' + str(i) + '">Guardar</button>'
+            texto = texto + "</div>"
+
+        libres = logica.libres_en_fecha(nombres_de_equipos(), partidos, fecha)
         if len(libres) > 0:
-            texto += f'<p class="libre">Libre: {escapar(", ".join(libres))}</p>'
-        texto += "</div>"
+            texto = texto + '<p class="libre">Libre: ' + escapar(", ".join(libres)) + "</p>"
+        texto = texto + "</div>"
+
     contenedor.innerHTML = texto
 
 
 def mostrar_tabla_de_posiciones():
     tabla = document.getElementById("tablaPosiciones")
-    if len(partidos) == 0:
+    if len(datos["partidos"]) == 0:
         tabla.innerHTML = ""
         return
 
-    filas = {}
-    for equipo in equipos:
-        filas[equipo["nombre"]] = {"equipo": equipo["nombre"], "pj": 0, "g": 0, "e": 0, "p": 0, "gf": 0, "gc": 0}
-
-    for partido in partidos:
-        if partido["golesLocal"] is None:
-            continue
-        local = filas[partido["local"]]
-        visitante = filas[partido["visitante"]]
-        local["pj"] += 1
-        visitante["pj"] += 1
-        local["gf"] += partido["golesLocal"]
-        local["gc"] += partido["golesVisitante"]
-        visitante["gf"] += partido["golesVisitante"]
-        visitante["gc"] += partido["golesLocal"]
-        if partido["golesLocal"] > partido["golesVisitante"]:
-            local["g"] += 1
-            visitante["p"] += 1
-        elif partido["golesLocal"] < partido["golesVisitante"]:
-            visitante["g"] += 1
-            local["p"] += 1
-        else:
-            local["e"] += 1
-            visitante["e"] += 1
-
-    lista = list(filas.values())
-    for fila in lista:
-        fila["dg"] = fila["gf"] - fila["gc"]
-        fila["pts"] = fila["g"] * 3 + fila["e"]
-    # Ordenamos por puntos, diferencia de gol y goles a favor
-    lista.sort(key=lambda f: (-f["pts"], -f["dg"], -f["gf"], f["equipo"].lower()))
-
+    filas = logica.calcular_tabla(nombres_de_equipos(), datos["partidos"])
     texto = ""
-    for i, fila in enumerate(lista):
-        dg = f"+{fila['dg']}" if fila["dg"] > 0 else str(fila["dg"])
-        texto += f"""
-          <tr>
-            <td>{i + 1}</td>
-            <td class="nombre">{escapar(fila["equipo"])}</td>
-            <td>{fila["pj"]}</td>
-            <td>{fila["g"]}</td>
-            <td>{fila["e"]}</td>
-            <td>{fila["p"]}</td>
-            <td>{fila["gf"]}</td>
-            <td>{fila["gc"]}</td>
-            <td>{dg}</td>
-            <td><b>{fila["pts"]}</b></td>
-          </tr>"""
+    for i in range(len(filas)):
+        fila = filas[i]
+        diferencia = str(fila["dg"])
+        if fila["dg"] > 0:
+            diferencia = "+" + diferencia
+        texto = texto + "<tr>"
+        texto = texto + "<td>" + str(i + 1) + "</td>"
+        texto = texto + '<td class="nombre">' + escapar(fila["equipo"]) + "</td>"
+        texto = texto + "<td>" + str(fila["pj"]) + "</td>"
+        texto = texto + "<td>" + str(fila["g"]) + "</td>"
+        texto = texto + "<td>" + str(fila["e"]) + "</td>"
+        texto = texto + "<td>" + str(fila["p"]) + "</td>"
+        texto = texto + "<td>" + str(fila["gf"]) + "</td>"
+        texto = texto + "<td>" + str(fila["gc"]) + "</td>"
+        texto = texto + "<td>" + diferencia + "</td>"
+        texto = texto + "<td><b>" + str(fila["pts"]) + "</b></td>"
+        texto = texto + "</tr>"
     tabla.innerHTML = texto
 
 
 # ---------- BORRAR TODO ----------
 
-def borrar_todo():
-    global jugadores, equipos, partidos, combinaciones_vistas
+def tocar_borrar_todo(evento):
     if not window.confirm("¿Seguro? Se borran jugadores, equipos y torneo."):
         return
-    jugadores = []
-    equipos = []
-    partidos = []
-    combinaciones_vistas = []
-    guardar()
+    datos["jugadores"] = []
+    datos["equipos"] = []
+    datos["partidos"] = []
+    datos["combinacionesVistas"] = []
+    guardar_datos()
     mostrar_todo()
 
+
+# ---------- DIBUJAR TODO ----------
 
 def mostrar_todo():
     mostrar_jugadores()
@@ -867,88 +501,10 @@ def mostrar_todo():
     mostrar_tabla_de_posiciones()
 
 
-# ---------- BOTONES Y EVENTOS ----------
-# "@when" conecta una función con algo que pasa en la página.
-# Para las tablas y los equipos, que se dibujan de nuevo cada vez, escuchamos
-# en el contenedor y miramos el "data-accion" del botón que se tocó.
-
-@when("submit", "#formJugador")
-def al_enviar_formulario(evento):
-    evento.preventDefault()
-    guardar_jugador()
-
-
-@when("change", "#posicion")
-def al_cambiar_posicion(evento):
-    actualizar_secundarias()
-
-
-@when("click", "#tablaJugadores")
-def al_tocar_en_jugadores(evento):
-    boton = evento.target
-    accion = boton.getAttribute("data-accion")
-    if accion == "editar":
-        editar_jugador(int(boton.getAttribute("data-indice")))
-    elif accion == "borrar":
-        borrar_jugador(int(boton.getAttribute("data-indice")))
-
-
-@when("change", "#tablaJugadores")
-def al_tildar_juega(evento):
-    casilla = evento.target
-    if casilla.getAttribute("data-accion") == "juega":
-        cambiar_juega(int(casilla.getAttribute("data-indice")), casilla.checked)
-
-
-@when("click", "#botonArmar")
-def al_tocar_armar(evento):
-    armar_equipos(False)
-
-
-@when("click", "#botonOtra")
-def al_tocar_otra(evento):
-    armar_equipos(True)
-
-
-@when("click", "#equipos")
-def al_tocar_en_equipos(evento):
-    boton = evento.target
-    if boton.getAttribute("data-accion") == "renombrar":
-        renombrar_equipo(int(boton.getAttribute("data-equipo")))
-
-
-@when("change", "#equipos")
-def al_mover_jugador(evento):
-    lista = evento.target
-    if lista.getAttribute("data-accion") == "mover":
-        mover_jugador(
-            int(lista.getAttribute("data-equipo")),
-            int(lista.getAttribute("data-lugar")),
-            int(lista.value),
-        )
-
-
-@when("click", "#botonTorneo")
-def al_tocar_torneo(evento):
-    armar_torneo()
-
-
-@when("click", "#fixture")
-def al_tocar_en_fixture(evento):
-    boton = evento.target
-    if boton.getAttribute("data-accion") == "resultado":
-        guardar_resultado(int(boton.getAttribute("data-partido")))
-
-
-@when("click", "#botonBorrarTodo")
-def al_tocar_borrar_todo(evento):
-    borrar_todo()
-
-
 # ---------- ARRANQUE ----------
 
-cargar()
-document.getElementById("formato").value = str(formato_actual)
+cargar_datos()
+document.getElementById("formato").value = str(datos["formatoActual"])
 mostrar_todo()
 
 # Python ya cargó: sacamos el cartel de "Cargando" y mostramos la página

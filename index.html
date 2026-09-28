@@ -6,7 +6,8 @@
   <title>Fulbito - Organizador de equipos</title>
   <link rel="stylesheet" href="style.css">
 
-  <!-- PyScript: permite que la página funcione con Python en vez de JavaScript -->
+  <!-- PyScript: permite que la página funcione con Python.
+       Cada botón con py-click="nombre" llama a esa función de pagina.py -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@pyscript/core@0.7.31/dist/core.css">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@pyscript/core@0.7.31/dist/core.js"></script>
 </head>
@@ -33,7 +34,7 @@
         <label>Regate <input type="number" id="regate" min="1" max="99" required></label>
         <label>Defensa <input type="number" id="defensa" min="1" max="99" required></label>
         <label>Posición principal
-          <select id="posicion">
+          <select id="posicion" py-change="tocar_posicion">
             <option value="">Elegí...</option>
             <option value="ARQ">Arquero</option>
             <option value="DEF">Defensor</option>
@@ -48,7 +49,7 @@
           <label><input type="checkbox" name="secundaria" value="MED"> Mediocampista</label>
           <label><input type="checkbox" name="secundaria" value="DEL"> Delantero</label>
         </fieldset>
-        <button type="submit">Guardar jugador</button>
+        <button type="button" py-click="tocar_guardar_jugador">Guardar jugador</button>
       </form>
       <p id="mensajeJugador" class="mensaje"></p>
 
@@ -94,8 +95,8 @@
           <input type="number" id="cantidadEquipos" value="2" min="2">
         </label>
         <label><input type="checkbox" id="usarPosiciones" checked> Emparejar también por posiciones</label>
-        <button id="botonArmar">Armar equipos parejos</button>
-        <button id="botonOtra" class="secundario">Otra combinación</button>
+        <button type="button" py-click="tocar_armar">Armar equipos parejos</button>
+        <button type="button" class="secundario" py-click="tocar_otra">Otra combinación</button>
       </div>
       <p id="mensajeEquipos" class="mensaje"></p>
 
@@ -110,7 +111,7 @@
 
       <div class="opciones">
         <label><input type="checkbox" id="idaYVuelta"> Ida y vuelta</label>
-        <button id="botonTorneo">Armar torneo</button>
+        <button type="button" py-click="tocar_torneo">Armar torneo</button>
       </div>
       <p id="mensajeTorneo" class="mensaje"></p>
 
@@ -143,10 +144,11 @@
   <footer>
     No inventa jugadores, no repite equipos y los atributos los ponés vos.
     <br>
-    <button id="botonBorrarTodo" class="peligro">Borrar todos los datos</button>
+    <button type="button" class="peligro" py-click="tocar_borrar_todo">Borrar todos los datos</button>
   </footer>
 
-  <!-- Todo el funcionamiento de la página está en pagina.py -->
-  <script type="py" src="pagina.py"></script>
+  <!-- Todo el funcionamiento de la página está en pagina.py.
+       "files" le pasa también logica.py, donde están las cuentas. -->
+  <script type="py" src="pagina.py" config='{"files": {"logica.py": ""}}'></script>
 </body>
 </html>
