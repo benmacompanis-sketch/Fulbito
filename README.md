@@ -51,20 +51,19 @@ python pruebas.py
 
 ## Cómo arma los equipos
 
-1. Reparte a los jugadores al azar, de a uno por equipo.
-2. Prueba cambiar jugadores de a dos entre equipos. Si con el cambio quedan más
-   parejos, lo deja; si no, lo vuelve atrás. Repite hasta que ningún cambio mejore.
-3. Hace todo eso varias veces y se queda con el resultado más parejo.
+1. Mezcla a los jugadores.
+2. Si se emparejan por posición, los pone en orden: primero los que pueden atajar,
+   después defensores, mediocampistas y delanteros.
+3. Los reparte de a uno por equipo, como cuando se "pisa".
+4. Prueba cambiar jugadores de a dos entre equipos (de la misma posición, si se
+   usan posiciones). Si la diferencia de media baja, deja el cambio.
+5. Hace todo eso 20 veces y se queda con los equipos más parejos.
 
-"Más parejo" quiere decir que la diferencia de media entre el mejor y el peor
-equipo sea lo más chica posible. Con "emparejar también por posiciones", además
-busca que cada equipo tenga parecida la cantidad de arqueros, defensores,
-mediocampistas y delanteros: la posición principal cuenta 1 y cada secundaria,
-medio.
+En cada equipo cada uno juega de su posición principal, pero si el equipo no
+tiene arquero, ataja el que tenga "arquero" de secundaria.
 
-Dentro de cada equipo, si falta un puesto (primero el arco), lo ocupa alguien
-que lo tenga de secundaria, y los jugadores se muestran en orden de arquero,
-defensores, mediocampistas y delanteros.
+En la página, para editar, borrar o mover a un jugador escribís su **número**
+(el N° de la tabla de jugadores) y tocás el botón.
 
 ## Qué hace y qué no
 

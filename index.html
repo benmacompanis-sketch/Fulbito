@@ -3,152 +3,151 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fulbito - Organizador de equipos</title>
+  <title>Fulbito</title>
   <link rel="stylesheet" href="style.css">
 
-  <!-- PyScript: permite que la página funcione con Python.
-       Cada botón con py-click="nombre" llama a esa función de pagina.py -->
+  <!-- PyScript: hace que la página funcione con Python -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@pyscript/core@0.7.31/dist/core.css">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@pyscript/core@0.7.31/dist/core.js"></script>
 </head>
 <body>
 
-  <header>
-    <h1>⚽ Fulbito</h1>
-    <p>Organizador de equipos y torneos parejos</p>
-  </header>
+  <h1>⚽ Fulbito</h1>
+  <p class="centrado">Organizador de equipos y torneos parejos</p>
+  <p id="cargando" class="centrado">Cargando Python... la primera vez tarda unos segundos.</p>
 
-  <p id="cargando" class="cargando">Cargando Python... la primera vez puede tardar unos segundos.</p>
+  <!-- ===== 1. JUGADORES ===== -->
+  <div class="caja">
+    <h2>1. Jugadores</h2>
 
-  <main id="contenido" hidden>
+    <p>Nombre: <input type="text" id="nombre"></p>
+    <p>
+      Ritmo: <input type="number" id="ritmo" class="corto">
+      Pase: <input type="number" id="pase" class="corto">
+      Regate: <input type="number" id="regate" class="corto">
+      Defensa: <input type="number" id="defensa" class="corto">
+    </p>
+    <p>
+      Posición principal:
+      <select id="posicion">
+        <option value="">Elegí...</option>
+        <option value="ARQ">Arquero</option>
+        <option value="DEF">Defensor</option>
+        <option value="MED">Mediocampista</option>
+        <option value="DEL">Delantero</option>
+      </select>
+    </p>
+    <p>
+      También puede jugar de:
+      <input type="checkbox" id="secundaria_ARQ"> Arquero
+      <input type="checkbox" id="secundaria_DEF"> Defensor
+      <input type="checkbox" id="secundaria_MED"> Mediocampista
+      <input type="checkbox" id="secundaria_DEL"> Delantero
+    </p>
+    <button py-click="guardar_jugador">Guardar jugador</button>
+    <p id="mensaje_jugador" class="mensaje"></p>
 
-    <!-- 1. JUGADORES -->
-    <section>
-      <h2>1. Jugadores</h2>
-      <p class="ayuda">Cargá cada jugador con sus atributos del 1 al 99, su posición principal y, si querés, en qué otras posiciones puede jugar. Si ponés un nombre que ya existe, se actualizan sus datos.</p>
+    <table>
+      <tr>
+        <th>N°</th>
+        <th>Juega</th>
+        <th>Nombre</th>
+        <th>Posición</th>
+        <th>Ritmo</th>
+        <th>Pase</th>
+        <th>Regate</th>
+        <th>Defensa</th>
+        <th>Media</th>
+      </tr>
+      <tbody id="tabla_jugadores"></tbody>
+    </table>
 
-      <form id="formJugador">
-        <input type="text" id="nombre" placeholder="Nombre" required>
-        <label>Ritmo <input type="number" id="ritmo" min="1" max="99" required></label>
-        <label>Pase <input type="number" id="pase" min="1" max="99" required></label>
-        <label>Regate <input type="number" id="regate" min="1" max="99" required></label>
-        <label>Defensa <input type="number" id="defensa" min="1" max="99" required></label>
-        <label>Posición principal
-          <select id="posicion" py-change="tocar_posicion">
-            <option value="">Elegí...</option>
-            <option value="ARQ">Arquero</option>
-            <option value="DEF">Defensor</option>
-            <option value="MED">Mediocampista</option>
-            <option value="DEL">Delantero</option>
-          </select>
-        </label>
-        <fieldset class="secundarias">
-          <legend>También puede jugar de (opcional)</legend>
-          <label><input type="checkbox" name="secundaria" value="ARQ"> Arquero</label>
-          <label><input type="checkbox" name="secundaria" value="DEF"> Defensor</label>
-          <label><input type="checkbox" name="secundaria" value="MED"> Mediocampista</label>
-          <label><input type="checkbox" name="secundaria" value="DEL"> Delantero</label>
-        </fieldset>
-        <button type="button" py-click="tocar_guardar_jugador">Guardar jugador</button>
-      </form>
-      <p id="mensajeJugador" class="mensaje"></p>
+    <p>
+      Jugador número: <input type="number" id="numero_jugador" class="corto">
+      <button py-click="editar_jugador">Editar</button>
+      <button py-click="cambiar_juega">Juega / No juega</button>
+      <button py-click="borrar_jugador">Borrar</button>
+    </p>
+  </div>
 
-      <div class="tabla-con-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Juega</th>
-              <th>Nombre</th>
-              <th>Posición</th>
-              <th>RIT</th>
-              <th>PAS</th>
-              <th>REG</th>
-              <th>DEF</th>
-              <th>Media</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody id="tablaJugadores"></tbody>
-        </table>
-      </div>
-    </section>
+  <!-- ===== 2. EQUIPOS ===== -->
+  <div class="caja">
+    <h2>2. Equipos</h2>
 
-    <!-- 2. EQUIPOS -->
-    <section>
-      <h2>2. Equipos</h2>
-      <p class="ayuda">
-        Se reparten los jugadores que tienen tildado "Juega". Si sobran, quedan como suplentes.
-        Con "Emparejar también por posiciones", además de la media se busca que cada equipo tenga
-        parecida la cantidad de arqueros, defensores, mediocampistas y delanteros
-        (la posición principal cuenta 1 y cada secundaria cuenta medio).
-      </p>
+    <p>
+      Formato:
+      <select id="formato">
+        <option value="5">F5</option>
+        <option value="8">F8</option>
+        <option value="11">F11</option>
+      </select>
+      Cantidad de equipos: <input type="number" id="cantidad_equipos" value="2" class="corto">
+    </p>
+    <p><input type="checkbox" id="usar_posiciones" checked> Emparejar también por posiciones</p>
+    <button py-click="armar_equipos">Armar equipos parejos</button>
+    <button py-click="otra_combinacion">Otra combinación</button>
+    <p id="mensaje_equipos" class="mensaje"></p>
 
-      <div class="opciones">
-        <label>Formato
-          <select id="formato">
-            <option value="5">F5</option>
-            <option value="8">F8</option>
-            <option value="11">F11</option>
-          </select>
-        </label>
-        <label>Cantidad de equipos
-          <input type="number" id="cantidadEquipos" value="2" min="2">
-        </label>
-        <label><input type="checkbox" id="usarPosiciones" checked> Emparejar también por posiciones</label>
-        <button type="button" py-click="tocar_armar">Armar equipos parejos</button>
-        <button type="button" class="secundario" py-click="tocar_otra">Otra combinación</button>
-      </div>
-      <p id="mensajeEquipos" class="mensaje"></p>
+    <div id="equipos"></div>
+    <p id="resumen_equipos"></p>
 
-      <div id="equipos"></div>
-      <p id="resumenEquipos" class="resumen"></p>
-    </section>
+    <h3>Cambiar los equipos a mano</h3>
+    <p>
+      Pasar al jugador número <input type="number" id="mover_jugador" class="corto">
+      al equipo número <input type="number" id="mover_equipo" class="corto">
+      <button py-click="mover_jugador">Mover</button>
+    </p>
+    <p>
+      Al equipo número <input type="number" id="renombrar_numero" class="corto">
+      ponerle de nombre <input type="text" id="renombrar_nombre">
+      <button py-click="renombrar_equipo">Cambiar nombre</button>
+    </p>
+  </div>
 
-    <!-- 3. TORNEO -->
-    <section>
-      <h2>3. Torneo</h2>
-      <p class="ayuda">Todos contra todos con los equipos de arriba. Cada cruce se juega una sola vez (o dos con ida y vuelta).</p>
+  <!-- ===== 3. TORNEO ===== -->
+  <div class="caja">
+    <h2>3. Torneo</h2>
 
-      <div class="opciones">
-        <label><input type="checkbox" id="idaYVuelta"> Ida y vuelta</label>
-        <button type="button" py-click="tocar_torneo">Armar torneo</button>
-      </div>
-      <p id="mensajeTorneo" class="mensaje"></p>
+    <p>
+      <input type="checkbox" id="ida_y_vuelta"> Ida y vuelta
+      <button py-click="armar_torneo">Armar torneo</button>
+    </p>
+    <p id="mensaje_torneo" class="mensaje"></p>
 
-      <div id="fixture"></div>
+    <div id="fixture"></div>
 
-      <h3>Tabla de posiciones</h3>
-      <div class="tabla-con-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Equipo</th>
-              <th>PJ</th>
-              <th>G</th>
-              <th>E</th>
-              <th>P</th>
-              <th>GF</th>
-              <th>GC</th>
-              <th>DG</th>
-              <th>Pts</th>
-            </tr>
-          </thead>
-          <tbody id="tablaPosiciones"></tbody>
-        </table>
-      </div>
-    </section>
+    <p>
+      Partido número <input type="number" id="numero_partido" class="corto">
+      Goles del local <input type="number" id="goles_local" class="corto">
+      Goles del visitante <input type="number" id="goles_visitante" class="corto">
+      <button py-click="guardar_resultado">Guardar resultado</button>
+    </p>
 
-  </main>
+    <h3>Tabla de posiciones</h3>
+    <table>
+      <tr>
+        <th>#</th>
+        <th>Equipo</th>
+        <th>PJ</th>
+        <th>G</th>
+        <th>E</th>
+        <th>P</th>
+        <th>GF</th>
+        <th>GC</th>
+        <th>DG</th>
+        <th>Puntos</th>
+      </tr>
+      <tbody id="tabla_posiciones"></tbody>
+    </table>
+  </div>
 
-  <footer>
+  <p class="centrado">
     No inventa jugadores, no repite equipos y los atributos los ponés vos.
     <br>
-    <button type="button" class="peligro" py-click="tocar_borrar_todo">Borrar todos los datos</button>
-  </footer>
+    <button py-click="borrar_todo" class="rojo">Borrar todos los datos</button>
+  </p>
 
-  <!-- Todo el funcionamiento de la página está en pagina.py.
-       "files" le pasa también logica.py, donde están las cuentas. -->
+  <!-- El programa de la página está en pagina.py, y las cuentas en logica.py -->
   <script type="py" src="pagina.py" config='{"files": {"logica.py": ""}}'></script>
 </body>
 </html>

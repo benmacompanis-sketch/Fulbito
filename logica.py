@@ -1,11 +1,10 @@
 # ==========================================
 # logica.py - Las cuentas de Fulbito
 # ==========================================
-# Acá están todas las cuentas: medias, armar equipos parejos,
-# puestos, fixture y tabla de posiciones.
-# Este archivo no muestra nada en pantalla. Eso lo hacen:
-#   main.py   -> la versión de consola
-#   pagina.py -> la página web
+# Acá están las cuentas: medias, armar equipos, fixture y tabla.
+# Lo usan los dos programas:
+#   main.py   = el programa de consola
+#   pagina.py = la página web
 
 import random
 
@@ -15,15 +14,10 @@ NOMBRES_ATRIBUTOS = {"ritmo": "Ritmo", "pase": "Pase", "regate": "Regate", "defe
 POSICIONES = ["ARQ", "DEF", "MED", "DEL"]
 NOMBRES_POSICIONES = {"ARQ": "Arquero", "DEF": "Defensor", "MED": "Mediocampista", "DEL": "Delantero"}
 
-# Cuánto importa que las posiciones queden parejas, comparado con la media.
-# Con 1, tener un delantero de más que otro equipo pesa igual que un punto de media.
-PESO_POSICIONES = 1
 
+# ---------- COSAS CHICAS ----------
 
-# ---------- COSAS CHICAS QUE SE USAN EN TODOS LADOS ----------
-
-# Convierte un texto en número entero.
-# Si el texto no es un número entero (por ejemplo "hola" o "7.5"), devuelve None.
+# Pasa un texto a número entero. Si no es un número entero, devuelve None.
 def convertir_numero(texto):
     texto = texto.strip()
     if texto.isdecimal():
@@ -31,12 +25,7 @@ def convertir_numero(texto):
     return None
 
 
-# Redondea a un decimal y lo devuelve como texto. Ejemplo: 66.666 -> "66.7"
-def redondear(numero):
-    return str(round(numero, 1))
-
-
-# Compara dos nombres sin importar mayúsculas ni espacios de más
+# Compara dos nombres sin importar mayúsculas
 def mismo_nombre(nombre1, nombre2):
     return nombre1.strip().lower() == nombre2.strip().lower()
 
@@ -48,24 +37,19 @@ def buscar_jugador(jugadores, nombre):
     return None
 
 
-# ---------- DATOS GUARDADOS ----------
-
-# Se asegura de que los datos leídos tengan todo lo que hace falta.
-# Sirve para los datos guardados por versiones anteriores del programa.
+# Completa lo que falte en los datos guardados por versiones viejas del programa
 def arreglar_datos(datos):
-    # La primera versión de consola guardaba los jugadores en inglés
+    # La primera versión guardaba los jugadores en inglés
     if "players" in datos:
-        jugadores = []
+        datos["jugadores"] = []
         for viejo in datos["players"]:
-            nuevo = {
-                "nombre": viejo["name"],
-                "ritmo": viejo["pace"],
-                "pase": viejo["passing"],
-                "regate": viejo["dribbling"],
-                "defensa": viejo["defending"],
-            }
-            jugadores.append(nuevo)
-        datos["jugadores"] = jugadores
+            nuevo = {}
+            nuevo["nombre"] = viejo["name"]
+            nuevo["ritmo"] = viejo["pace"]
+            nuevo["pase"] = viejo["passing"]
+            nuevo["regate"] = viejo["dribbling"]
+            nuevo["defensa"] = viejo["defending"]
+            datos["jugadores"].append(nuevo)
 
     if "jugadores" not in datos:
         datos["jugadores"] = []
@@ -78,7 +62,6 @@ def arreglar_datos(datos):
     if "formatoActual" not in datos:
         datos["formatoActual"] = 5
 
-    # Los jugadores cargados antes de que existieran las posiciones quedan sin posición
     for jugador in datos["jugadores"]:
         if "posicion" not in jugador:
             jugador["posicion"] = ""
@@ -90,9 +73,8 @@ def arreglar_datos(datos):
 
 # ---------- JUGADORES ----------
 
-# Revisa los datos de un jugador antes de guardarlo.
-# "numeros" es un diccionario con ritmo, pase, regate y defensa (o None si no eran números).
-# Devuelve el texto del error, o "" si está todo bien.
+# Revisa los datos antes de guardar un jugador.
+# Devuelve el error, o "" si está todo bien.
 def revisar_jugador(nombre, numeros, posicion):
     if nombre.strip() == "":
         return "Poné un nombre."
@@ -101,19 +83,13 @@ def revisar_jugador(nombre, numeros, posicion):
     for atributo in ATRIBUTOS:
         numero = numeros[atributo]
         if numero == None or numero < 1 or numero > 99:
-            return NOMBRES_ATRIBUTOS[atributo] + " tiene que ser un número entero del 1 al 99."
+            return NOMBRES_ATRIBUTOS[atributo] + " tiene que ser un número del 1 al 99."
     return ""
 
 
-# Guarda un jugador nuevo, o actualiza sus datos si ya existía uno con ese nombre.
-# Devuelve True si era nuevo y False si se actualizó.
+# Guarda un jugador. Si ya había uno con ese nombre, le cambia los datos.
+# Devuelve True si es nuevo y False si ya existía.
 def guardar_jugador(jugadores, nombre, numeros, posicion, secundarias):
-    # Las secundarias van siempre en el mismo orden y sin repetir la principal
-    secundarias_ordenadas = []
-    for otra in POSICIONES:
-        if otra in secundarias and otra != posicion:
-            secundarias_ordenadas.append(otra)
-
     jugador = buscar_jugador(jugadores, nombre)
     es_nuevo = False
     if jugador == None:
@@ -124,7 +100,12 @@ def guardar_jugador(jugadores, nombre, numeros, posicion, secundarias):
     for atributo in ATRIBUTOS:
         jugador[atributo] = numeros[atributo]
     jugador["posicion"] = posicion
-    jugador["secundarias"] = secundarias_ordenadas
+
+    # Las secundarias no repiten la principal ni se repiten entre ellas
+    jugador["secundarias"] = []
+    for otra in secundarias:
+        if otra != posicion and otra not in jugador["secundarias"]:
+            jugador["secundarias"].append(otra)
     return es_nuevo
 
 
@@ -136,55 +117,7 @@ def esta_en_un_equipo(equipos, nombre):
     return False
 
 
-# ---------- MEDIAS ----------
-
-# Media de un jugador: el promedio de sus 4 atributos
-def media_jugador(jugador):
-    suma = jugador["ritmo"] + jugador["pase"] + jugador["regate"] + jugador["defensa"]
-    return suma / 4
-
-
-# Media de una lista de jugadores.
-# Si "atributo" es "", es la media general; si no, la de ese atributo.
-def media_de_lista(lista_jugadores, atributo):
-    if len(lista_jugadores) == 0:
-        return 0
-    suma = 0
-    for jugador in lista_jugadores:
-        if atributo == "":
-            suma = suma + media_jugador(jugador)
-        else:
-            suma = suma + jugador[atributo]
-    return suma / len(lista_jugadores)
-
-
-# Pasa de la lista de nombres de un equipo a la lista de jugadores
-def jugadores_del_equipo(jugadores, equipo):
-    lista = []
-    for nombre in equipo["jugadores"]:
-        lista.append(buscar_jugador(jugadores, nombre))
-    return lista
-
-
-# Diferencia entre el equipo con mejor media y el de peor media
-def diferencia_entre_equipos(jugadores, equipos):
-    medias = []
-    for equipo in equipos:
-        medias.append(media_de_lista(jugadores_del_equipo(jugadores, equipo), ""))
-    return max(medias) - min(medias)
-
-
-# Promedio de las medias de todos los equipos
-def promedio_de_equipos(jugadores, equipos):
-    suma = 0
-    for equipo in equipos:
-        suma = suma + media_de_lista(jugadores_del_equipo(jugadores, equipo), "")
-    return suma / len(equipos)
-
-
-# ---------- POSICIONES ----------
-
-# Texto corto para mostrar. Ejemplo: "ARQ (DEF, MED)"
+# Texto para mostrar las posiciones. Ejemplo: "ARQ (DEF)"
 def texto_posiciones(jugador):
     if jugador["posicion"] == "":
         return "Sin posición"
@@ -194,56 +127,69 @@ def texto_posiciones(jugador):
     return texto
 
 
-# Decide en qué puesto juega cada jugador dentro de su equipo.
-# Devuelve un diccionario, por ejemplo {"Pepe": "ARQ", "Tito": "DEF"}.
-#
-# 1. Todos arrancan en su posición principal.
-# 2. Si al equipo le falta un puesto (primero el arco, después defensa,
-#    medio y delantera), lo ocupa alguien que lo tenga de secundaria.
-#    Sale de su puesto el que deja menos hueco: el que tiene más
-#    compañeros en su posición. Si empatan, el de menor media.
-#    Para el arco se acepta dejar otro puesto vacío; para los demás, no.
-def asignar_puestos(lista_jugadores):
+# ---------- MEDIAS ----------
+
+# Media de un jugador: el promedio de sus 4 atributos
+def media_jugador(jugador):
+    suma = jugador["ritmo"] + jugador["pase"] + jugador["regate"] + jugador["defensa"]
+    return suma / 4
+
+
+# Media de una lista de jugadores.
+# Si atributo es "" es la media general. Si no, la de ese atributo.
+def media_de_lista(lista, atributo):
+    if len(lista) == 0:
+        return 0
+    suma = 0
+    for jugador in lista:
+        if atributo == "":
+            suma = suma + media_jugador(jugador)
+        else:
+            suma = suma + jugador[atributo]
+    return suma / len(lista)
+
+
+# Un equipo guarda los nombres. Esto devuelve los jugadores de verdad.
+def jugadores_del_equipo(jugadores, equipo):
+    lista = []
+    for nombre in equipo["jugadores"]:
+        lista.append(buscar_jugador(jugadores, nombre))
+    return lista
+
+
+# Diferencia de media entre el mejor y el peor equipo
+def diferencia_entre_equipos(jugadores, equipos):
+    medias = []
+    for equipo in equipos:
+        medias.append(media_de_lista(jugadores_del_equipo(jugadores, equipo), ""))
+    return max(medias) - min(medias)
+
+
+# Promedio de las medias de los equipos
+def promedio_de_equipos(jugadores, equipos):
+    suma = 0
+    for equipo in equipos:
+        suma = suma + media_de_lista(jugadores_del_equipo(jugadores, equipo), "")
+    return suma / len(equipos)
+
+
+# ---------- PUESTOS DENTRO DE UN EQUIPO ----------
+
+# Dice de qué juega cada uno en su equipo. Cada uno juega de su posición principal,
+# pero si el equipo no tiene arquero, ataja el primero que tenga "arquero" de secundaria.
+def puestos_del_equipo(lista):
     puestos = {}
-    cuenta = {"ARQ": 0, "DEF": 0, "MED": 0, "DEL": 0}
-
-    # 1. Todos en su posición principal
-    for jugador in lista_jugadores:
+    hay_arquero = False
+    for jugador in lista:
         puestos[jugador["nombre"]] = jugador["posicion"]
-        if jugador["posicion"] != "":
-            cuenta[jugador["posicion"]] = cuenta[jugador["posicion"]] + 1
+        if jugador["posicion"] == "ARQ":
+            hay_arquero = True
 
-    # 2. Llenamos los puestos vacíos
-    for puesto in POSICIONES:
-        if cuenta[puesto] > 0:
-            continue
-
-        elegido = None
-        for jugador in lista_jugadores:
-            actual = puestos[jugador["nombre"]]
-            if puesto not in jugador["secundarias"]:
-                continue
-            if actual == "":
-                continue
-            if puesto != "ARQ" and cuenta[actual] < 2:
-                continue
-
-            if elegido == None:
-                elegido = jugador
-            else:
-                companeros_nuevo = cuenta[actual]
-                companeros_elegido = cuenta[puestos[elegido["nombre"]]]
-                if companeros_nuevo > companeros_elegido:
-                    elegido = jugador
-                elif companeros_nuevo == companeros_elegido:
-                    if media_jugador(jugador) < media_jugador(elegido):
-                        elegido = jugador
-
-        if elegido != None:
-            anterior = puestos[elegido["nombre"]]
-            cuenta[anterior] = cuenta[anterior] - 1
-            puestos[elegido["nombre"]] = puesto
-            cuenta[puesto] = cuenta[puesto] + 1
+    if hay_arquero == False:
+        for jugador in lista:
+            if "ARQ" in jugador["secundarias"]:
+                puestos[jugador["nombre"]] = "ARQ"
+                break
 
     return puestos
 
@@ -258,238 +204,164 @@ def contar_puestos(puestos):
     return cuenta
 
 
-# Número de orden de un puesto: ARQ=0, DEF=1, MED=2, DEL=3 y sin puesto=4
+# Número de cada puesto para ordenar: ARQ=0, DEF=1, MED=2, DEL=3, sin puesto=4
 def numero_de_puesto(puesto):
     if puesto == "":
         return 4
     return POSICIONES.index(puesto)
 
 
-# ¿El jugador "a" se muestra antes que el "b"? Primero por puesto y después por media.
-def va_antes_en_equipo(a, b, puestos):
-    numero_a = numero_de_puesto(puestos[a["nombre"]])
-    numero_b = numero_de_puesto(puestos[b["nombre"]])
-    if numero_a != numero_b:
-        return numero_a < numero_b
-    return media_jugador(a) > media_jugador(b)
+# Ordena el equipo para mostrarlo: arquero, defensores, medios y delanteros.
+# Usa el método burbuja: compara de a dos y los da vuelta si están mal.
+def ordenar_para_mostrar(lista, puestos):
+    ordenada = []
+    for jugador in lista:
+        ordenada.append(jugador)
 
-
-# Ordena los jugadores de un equipo para mostrarlos:
-# arquero, defensores, mediocampistas y delanteros (método burbuja).
-def ordenar_para_mostrar(lista_jugadores, puestos):
-    lista = []
-    for jugador in lista_jugadores:
-        lista.append(jugador)
-
-    for vuelta in range(len(lista)):
-        for i in range(len(lista) - 1):
-            if va_antes_en_equipo(lista[i + 1], lista[i], puestos):
-                guardado = lista[i]
-                lista[i] = lista[i + 1]
-                lista[i + 1] = guardado
-    return lista
+    for vuelta in range(len(ordenada)):
+        for i in range(len(ordenada) - 1):
+            a = ordenada[i]
+            b = ordenada[i + 1]
+            numero_a = numero_de_puesto(puestos[a["nombre"]])
+            numero_b = numero_de_puesto(puestos[b["nombre"]])
+            if numero_b < numero_a or (numero_b == numero_a and media_jugador(b) > media_jugador(a)):
+                ordenada[i] = b
+                ordenada[i + 1] = a
+    return ordenada
 
 
 # ---------- ARMAR EQUIPOS PAREJOS ----------
 
-# Una "ficha" tiene lo que hace falta para comparar equipos:
-# el nombre, la media y cuánto aporta a cada posición
-# (1 si es su posición principal, 0.5 si es secundaria, 0 si no la juega).
-# Se calcula una sola vez para que después las cuentas vayan rápido.
-def hacer_fichas(lista_jugadores):
-    fichas = []
-    for jugador in lista_jugadores:
-        ficha = {"nombre": jugador["nombre"], "media": media_jugador(jugador)}
-        for posicion in POSICIONES:
-            if jugador["posicion"] == posicion:
-                ficha[posicion] = 1
-            elif posicion in jugador["secundarias"]:
-                ficha[posicion] = 0.5
-            else:
-                ficha[posicion] = 0
-        fichas.append(ficha)
-    return fichas
+# Para repartir, el que puede atajar (de principal o secundaria) cuenta como arquero.
+# Así los que atajan quedan en equipos distintos.
+def grupo_para_repartir(jugador):
+    if jugador["posicion"] == "ARQ" or "ARQ" in jugador["secundarias"]:
+        return "ARQ"
+    return jugador["posicion"]
 
 
-# Qué tan desparejos son unos equipos. Cuanto más bajo, más parejos.
-# Suma la diferencia de media entre el mejor y el peor equipo, y
-# (si se usan posiciones) la diferencia en cada posición.
-def desparejo(grupos, usar_posiciones):
+# Pone primero a los arqueros, después defensores, medios, delanteros y los sin posición
+def ordenar_por_posicion(jugadores):
+    resultado = []
+    for grupo in ["ARQ", "DEF", "MED", "DEL", ""]:
+        for jugador in jugadores:
+            if grupo_para_repartir(jugador) == grupo:
+                resultado.append(jugador)
+    return resultado
+
+
+# Diferencia de media entre el mejor y el peor grupo
+def diferencia_de_grupos(grupos):
     medias = []
     for grupo in grupos:
-        suma = 0
-        for ficha in grupo:
-            suma = suma + ficha["media"]
-        medias.append(suma / len(grupo))
-    puntaje = max(medias) - min(medias)
-
-    if usar_posiciones:
-        for posicion in POSICIONES:
-            cantidades = []
-            for grupo in grupos:
-                cantidad = 0
-                for ficha in grupo:
-                    cantidad = cantidad + ficha[posicion]
-                cantidades.append(cantidad)
-            puntaje = puntaje + PESO_POSICIONES * (max(cantidades) - min(cantidades))
-
-    return puntaje
-
-
-# Mezcla las fichas y las reparte de a una por equipo (como cuando se "pisa")
-def repartir_al_azar(fichas, cantidad_equipos):
-    mezcladas = []
-    for ficha in fichas:
-        mezcladas.append(ficha)
-    random.shuffle(mezcladas)
-
-    grupos = []
-    for i in range(cantidad_equipos):
-        grupos.append([])
-    for i in range(len(mezcladas)):
-        grupos[i % cantidad_equipos].append(mezcladas[i])
-    return grupos
-
-
-# Cambia al jugador i del equipo a por el jugador j del equipo b
-def intercambiar(grupos, a, i, b, j):
-    guardado = grupos[a][i]
-    grupos[a][i] = grupos[b][j]
-    grupos[b][j] = guardado
+        medias.append(media_de_lista(grupo, ""))
+    return max(medias) - min(medias)
 
 
 # Prueba cambiar jugadores de a dos entre equipos.
-# Si con el cambio quedan más parejos, lo deja. Si no, lo vuelve atrás.
-# Repite hasta que ningún cambio mejore.
+# Si la diferencia de media baja, deja el cambio. Si no, lo vuelve atrás.
+# Si se usan posiciones, solo cambia jugadores del mismo grupo de posición.
 def mejorar(grupos, usar_posiciones):
-    actual = desparejo(grupos, usar_posiciones)
-    hubo_mejora = True
-    while hubo_mejora:
-        hubo_mejora = False
+    hubo_cambio = True
+    while hubo_cambio:
+        hubo_cambio = False
         for a in range(len(grupos)):
             for b in range(a + 1, len(grupos)):
                 for i in range(len(grupos[a])):
                     for j in range(len(grupos[b])):
-                        intercambiar(grupos, a, i, b, j)
-                        nuevo = desparejo(grupos, usar_posiciones)
-                        if nuevo < actual - 0.0001:
-                            actual = nuevo
-                            hubo_mejora = True
+                        jugador_a = grupos[a][i]
+                        jugador_b = grupos[b][j]
+                        if usar_posiciones and grupo_para_repartir(jugador_a) != grupo_para_repartir(jugador_b):
+                            continue
+
+                        antes = diferencia_de_grupos(grupos)
+                        grupos[a][i] = jugador_b
+                        grupos[b][j] = jugador_a
+                        despues = diferencia_de_grupos(grupos)
+
+                        if despues < antes - 0.001:
+                            hubo_cambio = True
                         else:
-                            intercambiar(grupos, a, i, b, j)
+                            grupos[a][i] = jugador_a
+                            grupos[b][j] = jugador_b
 
 
-# Cambia dos jugadores al azar de dos equipos distintos
-def cambio_al_azar(grupos):
-    a = random.randint(0, len(grupos) - 1)
-    b = random.randint(0, len(grupos) - 1)
-    while b == a:
-        b = random.randint(0, len(grupos) - 1)
-    i = random.randint(0, len(grupos[a]) - 1)
-    j = random.randint(0, len(grupos[b]) - 1)
-    intercambiar(grupos, a, i, b, j)
-
-
-# Texto que identifica una combinación de equipos sin importar el orden.
-# Sirve para no mostrar dos veces la misma combinación.
-def armar_clave(listas_de_nombres):
+# Texto que identifica una combinación de equipos, para no repetirla
+def clave_de_equipos(equipos):
     partes = []
-    for nombres in listas_de_nombres:
-        copia = []
-        for nombre in nombres:
-            copia.append(nombre.lower())
-        copia.sort()
-        partes.append(",".join(copia))
+    for equipo in equipos:
+        nombres = []
+        for nombre in equipo["jugadores"]:
+            nombres.append(nombre.lower())
+        nombres.sort()
+        partes.append(",".join(nombres))
     partes.sort()
     return " | ".join(partes)
 
 
-def clave_de_equipos(equipos):
-    listas = []
-    for equipo in equipos:
-        listas.append(equipo["jugadores"])
-    return armar_clave(listas)
-
-
-def clave_de_grupos(grupos):
-    listas = []
-    for grupo in grupos:
-        nombres = []
-        for ficha in grupo:
-            nombres.append(ficha["nombre"])
-        listas.append(nombres)
-    return armar_clave(listas)
-
-
-# Arma los equipos más parejos que encuentre y que no estén en "vistas".
+# Arma los equipos más parejos que encuentre, sin repetir los de "vistas".
 # Devuelve la lista de equipos, o None si no encontró ninguna combinación nueva.
-def armar_equipos(lista_jugadores, cantidad_equipos, usar_posiciones, vistas):
-    fichas = hacer_fichas(lista_jugadores)
-
-    # Con muchos jugadores cada intento tarda más, así que hacemos menos
-    intentos = 20
-    if len(fichas) > 30:
-        intentos = 8
-
+def armar_equipos(jugadores, cantidad, usar_posiciones, vistas):
     mejor = None
-    mejor_puntaje = 0
-    for intento in range(intentos):
-        grupos = repartir_al_azar(fichas, cantidad_equipos)
+    mejor_diferencia = 0
+
+    for intento in range(20):
+        # 1. Mezclamos a los jugadores
+        mezclados = []
+        for jugador in jugadores:
+            mezclados.append(jugador)
+        random.shuffle(mezclados)
+
+        # 2. Si se usan posiciones, los ponemos en orden de posición
+        if usar_posiciones:
+            mezclados = ordenar_por_posicion(mezclados)
+
+        # 3. Los repartimos de a uno por equipo, como cuando se "pisa"
+        grupos = []
+        for numero in range(cantidad):
+            grupos.append([])
+        for i in range(len(mezclados)):
+            grupos[i % cantidad].append(mezclados[i])
+
+        # 4. Probamos cambios para que las medias queden parejas
         mejorar(grupos, usar_posiciones)
 
-        # Si esta combinación ya salió antes, la movemos un poco hasta que sea nueva
-        vueltas = 0
-        while clave_de_grupos(grupos) in vistas and vueltas < 50:
-            cambio_al_azar(grupos)
-            vueltas = vueltas + 1
-        if clave_de_grupos(grupos) in vistas:
+        # 5. Pasamos a equipos con nombres
+        equipos = []
+        for numero in range(cantidad):
+            nombres = []
+            for jugador in grupos[numero]:
+                nombres.append(jugador["nombre"])
+            equipos.append({"nombre": "Equipo " + str(numero + 1), "jugadores": nombres})
+
+        # 6. Si ya salió antes, la descartamos. Si no, nos quedamos con la más pareja.
+        if clave_de_equipos(equipos) in vistas:
             continue
+        diferencia = diferencia_de_grupos(grupos)
+        if mejor == None or diferencia < mejor_diferencia:
+            mejor = equipos
+            mejor_diferencia = diferencia
 
-        puntaje = desparejo(grupos, usar_posiciones)
-        if mejor == None or puntaje < mejor_puntaje:
-            mejor = grupos
-            mejor_puntaje = puntaje
-
-    if mejor == None:
-        return None
-
-    # Pasamos de fichas a equipos con nombres
-    equipos = []
-    for i in range(len(mejor)):
-        nombres = []
-        for ficha in mejor[i]:
-            nombres.append(ficha["nombre"])
-        equipos.append({"nombre": "Equipo " + str(i + 1), "jugadores": nombres})
-    return equipos
+    return mejor
 
 
 # ---------- CAMBIOS A MANO ----------
 
-# Devuelve en qué número de equipo está un jugador (o -1 si no está en ninguno)
-def equipo_del_jugador(equipos, nombre):
-    for i in range(len(equipos)):
-        for otro in equipos[i]["jugadores"]:
-            if mismo_nombre(otro, nombre):
-                return i
-    return -1
-
-
-# Pasa un jugador al equipo número "destino".
-# Devuelve False si no se puede: si no está en ningún equipo o si dejaría a su equipo vacío.
+# Pasa a un jugador al equipo número "destino" (empezando de 0).
+# Devuelve False si no se puede (no está en ningún equipo o dejaría un equipo vacío).
 def mover_jugador(equipos, nombre, destino):
-    origen = equipo_del_jugador(equipos, nombre)
-    if origen == -1:
-        return False
-    if origen == destino:
-        return True
-    if len(equipos[origen]["jugadores"]) == 1:
-        return False
-    equipos[origen]["jugadores"].remove(nombre)
-    equipos[destino]["jugadores"].append(nombre)
-    return True
+    for equipo in equipos:
+        for otro in equipo["jugadores"]:
+            if mismo_nombre(otro, nombre):
+                if len(equipo["jugadores"]) == 1:
+                    return False
+                equipo["jugadores"].remove(otro)
+                equipos[destino]["jugadores"].append(otro)
+                return True
+    return False
 
 
-# Cambia el nombre de un equipo, también en el fixture.
+# Le cambia el nombre a un equipo, también en el fixture.
 # Devuelve False si ya hay otro equipo con ese nombre.
 def renombrar_equipo(equipos, partidos, indice, nuevo):
     nuevo = nuevo.strip()
@@ -513,30 +385,25 @@ def nuevo_partido(fecha, local, visitante):
     return {"fecha": fecha, "local": local, "visitante": visitante, "golesLocal": None, "golesVisitante": None}
 
 
-# Fixture todos contra todos (método del círculo): cada par de equipos
-# se cruza una sola vez, o dos si es ida y vuelta.
-# Si la cantidad de equipos es impar, uno queda libre en cada fecha.
-def crear_fixture(nombres_equipos, ida_y_vuelta):
+# Fixture todos contra todos: cada par de equipos juega una vez (dos si es ida y vuelta).
+# Si son impares, en cada fecha uno queda libre.
+def crear_fixture(nombres, ida_y_vuelta):
     lista = []
-    for nombre in nombres_equipos:
+    for nombre in nombres:
         lista.append(nombre)
     if len(lista) % 2 == 1:
-        lista.append(None)  # None = fecha libre
+        lista.append(None)  # None quiere decir "fecha libre"
 
     total = len(lista)
     partidos = []
     for fecha in range(1, total):
+        # El primero juega con el último, el segundo con el anteúltimo, y así
         for k in range(total // 2):
             local = lista[k]
             visitante = lista[total - 1 - k]
             if local != None and visitante != None:
-                # Alternamos la localía del primer partido de cada fecha
-                if fecha % 2 == 0 and k == 0:
-                    guardado = local
-                    local = visitante
-                    visitante = guardado
                 partidos.append(nuevo_partido(fecha, local, visitante))
-        # Rotamos a todos menos al primero
+        # Para la fecha siguiente, el último pasa al segundo lugar
         ultimo = lista.pop()
         lista.insert(1, ultimo)
 
@@ -549,20 +416,6 @@ def crear_fixture(nombres_equipos, ida_y_vuelta):
     return partidos
 
 
-# Equipos que no juegan en una fecha
-def libres_en_fecha(nombres_equipos, partidos, fecha):
-    juegan = []
-    for partido in partidos:
-        if partido["fecha"] == fecha:
-            juegan.append(partido["local"])
-            juegan.append(partido["visitante"])
-    libres = []
-    for nombre in nombres_equipos:
-        if nombre not in juegan:
-            libres.append(nombre)
-    return libres
-
-
 def ultima_fecha(partidos):
     ultima = 0
     for partido in partidos:
@@ -571,22 +424,24 @@ def ultima_fecha(partidos):
     return ultima
 
 
-# ¿La fila "a" va arriba de la "b" en la tabla?
-# Primero por puntos, después diferencia de gol, goles a favor y nombre.
-def va_antes_en_tabla(a, b):
-    if a["pts"] != b["pts"]:
-        return a["pts"] > b["pts"]
-    if a["dg"] != b["dg"]:
-        return a["dg"] > b["dg"]
-    if a["gf"] != b["gf"]:
-        return a["gf"] > b["gf"]
-    return a["equipo"].lower() < b["equipo"].lower()
+# Equipos que no juegan en una fecha
+def libres_en_fecha(nombres, partidos, fecha):
+    juegan = []
+    for partido in partidos:
+        if partido["fecha"] == fecha:
+            juegan.append(partido["local"])
+            juegan.append(partido["visitante"])
+    libres = []
+    for nombre in nombres:
+        if nombre not in juegan:
+            libres.append(nombre)
+    return libres
 
 
-# Tabla de posiciones: 3 puntos por partido ganado y 1 por empate
-def calcular_tabla(nombres_equipos, partidos):
+# Tabla de posiciones: 3 puntos por ganar y 1 por empatar
+def calcular_tabla(nombres, partidos):
     filas = []
-    for nombre in nombres_equipos:
+    for nombre in nombres:
         filas.append({"equipo": nombre, "pj": 0, "g": 0, "e": 0, "p": 0, "gf": 0, "gc": 0, "dg": 0, "pts": 0})
 
     for partido in partidos:
@@ -622,12 +477,13 @@ def calcular_tabla(nombres_equipos, partidos):
         fila["dg"] = fila["gf"] - fila["gc"]
         fila["pts"] = fila["g"] * 3 + fila["e"]
 
-    # Ordenamos con el método burbuja
+    # Ordenamos con el método burbuja: más puntos arriba, y si empatan, mejor diferencia de gol
     for vuelta in range(len(filas)):
         for i in range(len(filas) - 1):
-            if va_antes_en_tabla(filas[i + 1], filas[i]):
-                guardado = filas[i]
-                filas[i] = filas[i + 1]
-                filas[i + 1] = guardado
+            a = filas[i]
+            b = filas[i + 1]
+            if b["pts"] > a["pts"] or (b["pts"] == a["pts"] and b["dg"] > a["dg"]):
+                filas[i] = b
+                filas[i + 1] = a
 
     return filas

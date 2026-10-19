@@ -1,14 +1,12 @@
 # ==========================================
-# pagina.py - Fulbito en la página web
+# pagina.py - El programa de la página web
 # ==========================================
-# Este archivo hace funcionar la página (index.html).
-# Corre dentro del navegador gracias a PyScript.
-# Las cuentas están en logica.py.
+# Cada botón de index.html llama a una función de acá. Por ejemplo:
+#     <button py-click="guardar_jugador">
+# llama a la función guardar_jugador.
+# Esas funciones reciben "evento" (lo que pasó), pero no hace falta usarlo.
 #
-# En index.html cada botón dice qué función de acá llama. Por ejemplo:
-#     <button py-click="tocar_armar">
-# llama a la función tocar_armar cuando lo tocan.
-# Esas funciones reciben el "evento": ahí dice qué botón se tocó.
+# Las cuentas están en logica.py.
 
 import json
 from pyscript import document, window
@@ -24,8 +22,44 @@ datos = {
 }
 
 
-# ---------- GUARDAR Y CARGAR ----------
-# Los datos se guardan en el navegador (en "localStorage") con el nombre "fulbito".
+# ---------- LEER Y ESCRIBIR EN LA PÁGINA ----------
+
+# Devuelve lo que está escrito en una casilla
+def leer(id_casilla):
+    return document.getElementById(id_casilla).value
+
+
+# Escribe algo en una casilla
+def poner(id_casilla, texto):
+    document.getElementById(id_casilla).value = texto
+
+
+# Devuelve True si la casilla está tildada
+def tildado(id_casilla):
+    return document.getElementById(id_casilla).checked
+
+
+# Pone HTML adentro de un elemento de la página
+def mostrar_html(id_elemento, html):
+    document.getElementById(id_elemento).innerHTML = html
+
+
+# Muestra un mensaje. tipo puede ser "ok" (verde) o "error" (rojo).
+def mostrar_mensaje(id_mensaje, texto, tipo):
+    mensaje = document.getElementById(id_mensaje)
+    mensaje.innerHTML = texto
+    mensaje.className = "mensaje " + tipo
+
+
+# Para que un nombre con < o > no rompa la página
+def limpiar(texto):
+    texto = texto.replace("<", "&lt;")
+    texto = texto.replace(">", "&gt;")
+    return texto
+
+
+# ---------- GUARDAR EN EL NAVEGADOR ----------
+# Los datos se guardan en el navegador con el nombre "fulbito"
 
 def guardar_datos():
     window.localStorage.setItem("fulbito", json.dumps(datos))
@@ -33,9 +67,8 @@ def guardar_datos():
 
 def cargar_datos():
     texto = window.localStorage.getItem("fulbito")
-    # Si no había nada guardado, no hay texto
     if not texto:
-        return
+        return  # todavía no había nada guardado
     leidos = json.loads(texto)
     logica.arreglar_datos(leidos)
     datos["jugadores"] = leidos["jugadores"]
@@ -45,166 +78,147 @@ def cargar_datos():
     datos["formatoActual"] = leidos["formatoActual"]
 
 
-# ---------- COSAS CHICAS ----------
+# ---------- 1. JUGADORES ----------
 
-# Cambia los símbolos especiales para que un nombre como "<b>Juan</b>"
-# se vea tal cual y no rompa la página
-def escapar(texto):
-    texto = str(texto)
-    texto = texto.replace("&", "&amp;")
-    texto = texto.replace("<", "&lt;")
-    texto = texto.replace(">", "&gt;")
-    texto = texto.replace('"', "&quot;")
-    texto = texto.replace("'", "&#39;")
-    return texto
-
-
-# Muestra un mensaje. "tipo" es "ok" (verde), "error" (rojo) o "" (normal).
-def mostrar_mensaje(id_mensaje, texto, tipo):
-    mensaje = document.getElementById(id_mensaje)
-    mensaje.textContent = texto
-    mensaje.className = "mensaje " + tipo
-
-
-# ---------- JUGADORES ----------
-
-def leer_secundarias():
-    secundarias = []
-    for casilla in document.querySelectorAll('input[name="secundaria"]'):
-        if casilla.checked:
-            secundarias.append(casilla.value)
-    return secundarias
-
-
-# La posición principal no puede ser también secundaria: la destildamos y la bloqueamos
-def actualizar_secundarias():
-    principal = document.getElementById("posicion").value
-    for casilla in document.querySelectorAll('input[name="secundaria"]'):
-        if casilla.value == principal:
-            casilla.checked = False
-            casilla.disabled = True
-        else:
-            casilla.disabled = False
-
-
-def tocar_posicion(evento):
-    actualizar_secundarias()
-
-
-def tocar_guardar_jugador(evento):
-    nombre = document.getElementById("nombre").value.strip()
+def guardar_jugador(evento):
+    nombre = leer("nombre").strip()
     numeros = {}
     for atributo in logica.ATRIBUTOS:
-        numeros[atributo] = logica.convertir_numero(document.getElementById(atributo).value)
-    posicion = document.getElementById("posicion").value
-    secundarias = leer_secundarias()
+        numeros[atributo] = logica.convertir_numero(leer(atributo))
+    posicion = leer("posicion")
+
+    secundarias = []
+    for otra in logica.POSICIONES:
+        if tildado("secundaria_" + otra):
+            secundarias.append(otra)
 
     error = logica.revisar_jugador(nombre, numeros, posicion)
     if error != "":
-        mostrar_mensaje("mensajeJugador", error, "error")
+        mostrar_mensaje("mensaje_jugador", error, "error")
         return
 
     es_nuevo = logica.guardar_jugador(datos["jugadores"], nombre, numeros, posicion, secundarias)
-    jugador = logica.buscar_jugador(datos["jugadores"], nombre)
-    media = logica.redondear(logica.media_jugador(jugador))
     if es_nuevo:
-        mostrar_mensaje("mensajeJugador", "Listo: " + jugador["nombre"] + ", media " + media + ".", "ok")
+        mostrar_mensaje("mensaje_jugador", "Listo, se guardó a " + limpiar(nombre) + ".", "ok")
     else:
-        mostrar_mensaje("mensajeJugador", "Actualizado: " + jugador["nombre"] + ", media " + media + ".", "ok")
+        mostrar_mensaje("mensaje_jugador", "Se actualizaron los datos de " + limpiar(nombre) + ".", "ok")
 
-    # Dejamos el formulario vacío para cargar otro
-    document.getElementById("formJugador").reset()
-    actualizar_secundarias()
-    document.getElementById("nombre").focus()
+    # Vaciamos el formulario para cargar otro
+    poner("nombre", "")
+    for atributo in logica.ATRIBUTOS:
+        poner(atributo, "")
+    poner("posicion", "")
+    for otra in logica.POSICIONES:
+        document.getElementById("secundaria_" + otra).checked = False
+
     guardar_datos()
     mostrar_todo()
 
 
-# Pone los datos de un jugador en el formulario para cambiarlos
-def tocar_editar(evento):
-    indice = int(evento.target.getAttribute("data-indice"))
-    jugador = datos["jugadores"][indice]
+# Devuelve el jugador del número escrito en la casilla, o None si el número está mal
+def jugador_elegido(id_casilla, id_mensaje):
+    numero = logica.convertir_numero(leer(id_casilla))
+    if numero == None or numero < 1 or numero > len(datos["jugadores"]):
+        mostrar_mensaje(id_mensaje, "Poné un número de jugador de la tabla.", "error")
+        return None
+    return datos["jugadores"][numero - 1]
 
-    document.getElementById("nombre").value = jugador["nombre"]
+
+# Pone los datos del jugador en el formulario para cambiarlos
+def editar_jugador(evento):
+    jugador = jugador_elegido("numero_jugador", "mensaje_jugador")
+    if jugador == None:
+        return
+
+    poner("nombre", jugador["nombre"])
     for atributo in logica.ATRIBUTOS:
-        document.getElementById(atributo).value = str(jugador[atributo])
-    document.getElementById("posicion").value = jugador["posicion"]
-    for casilla in document.querySelectorAll('input[name="secundaria"]'):
-        casilla.checked = casilla.value in jugador["secundarias"]
-    actualizar_secundarias()
-
-    mostrar_mensaje("mensajeJugador", "Cambiá lo que quieras y tocá Guardar jugador.", "")
-    document.getElementById("ritmo").focus()
+        poner(atributo, str(jugador[atributo]))
+    poner("posicion", jugador["posicion"])
+    for otra in logica.POSICIONES:
+        casilla = document.getElementById("secundaria_" + otra)
+        casilla.checked = otra in jugador["secundarias"]
+    mostrar_mensaje("mensaje_jugador", "Cambiá lo que quieras arriba y tocá Guardar jugador.", "")
 
 
-def tocar_borrar(evento):
-    indice = int(evento.target.getAttribute("data-indice"))
-    jugador = datos["jugadores"][indice]
+def cambiar_juega(evento):
+    jugador = jugador_elegido("numero_jugador", "mensaje_jugador")
+    if jugador == None:
+        return
+
+    if jugador["juega"]:
+        jugador["juega"] = False
+        mostrar_mensaje("mensaje_jugador", limpiar(jugador["nombre"]) + " no juega.", "ok")
+    else:
+        jugador["juega"] = True
+        mostrar_mensaje("mensaje_jugador", limpiar(jugador["nombre"]) + " juega.", "ok")
+    guardar_datos()
+    mostrar_todo()
+
+
+def borrar_jugador(evento):
+    jugador = jugador_elegido("numero_jugador", "mensaje_jugador")
+    if jugador == None:
+        return
 
     if logica.esta_en_un_equipo(datos["equipos"], jugador["nombre"]):
-        mostrar_mensaje("mensajeJugador", jugador["nombre"] + " está en un equipo. Armá equipos nuevos antes de borrarlo.", "error")
+        mostrar_mensaje("mensaje_jugador", limpiar(jugador["nombre"]) + " está en un equipo. Armá equipos nuevos antes de borrarlo.", "error")
         return
     if not window.confirm("¿Borrar a " + jugador["nombre"] + "?"):
         return
 
-    datos["jugadores"].pop(indice)
+    datos["jugadores"].remove(jugador)
+    mostrar_mensaje("mensaje_jugador", "Jugador borrado.", "ok")
     guardar_datos()
     mostrar_todo()
 
 
-# Tildar o destildar "Juega"
-def tocar_juega(evento):
-    indice = int(evento.target.getAttribute("data-indice"))
-    datos["jugadores"][indice]["juega"] = evento.target.checked
-    guardar_datos()
-
-
 def mostrar_jugadores():
-    tabla = document.getElementById("tablaJugadores")
     if len(datos["jugadores"]) == 0:
-        tabla.innerHTML = '<tr><td colspan="9">Todavía no cargaste jugadores.</td></tr>'
+        mostrar_html("tabla_jugadores", '<tr><td colspan="9">Todavía no cargaste jugadores.</td></tr>')
         return
 
-    filas = ""
-    for i in range(len(datos["jugadores"])):
-        jugador = datos["jugadores"][i]
-        tildado = ""
+    html = ""
+    numero = 1
+    for jugador in datos["jugadores"]:
+        juega = "No"
         if jugador["juega"]:
-            tildado = "checked"
+            juega = "Sí"
+        media = str(round(logica.media_jugador(jugador), 1))
 
-        filas = filas + "<tr>"
-        filas = filas + '<td><input type="checkbox" ' + tildado + ' py-change="tocar_juega" data-indice="' + str(i) + '"></td>'
-        filas = filas + '<td class="nombre">' + escapar(jugador["nombre"]) + "</td>"
-        filas = filas + '<td class="posicion">' + logica.texto_posiciones(jugador) + "</td>"
-        for atributo in logica.ATRIBUTOS:
-            filas = filas + "<td>" + str(jugador[atributo]) + "</td>"
-        filas = filas + "<td><b>" + logica.redondear(logica.media_jugador(jugador)) + "</b></td>"
-        filas = filas + "<td>"
-        filas = filas + '<button class="chico secundario" py-click="tocar_editar" data-indice="' + str(i) + '">Editar</button> '
-        filas = filas + '<button class="chico peligro" py-click="tocar_borrar" data-indice="' + str(i) + '">Borrar</button>'
-        filas = filas + "</td>"
-        filas = filas + "</tr>"
-    tabla.innerHTML = filas
+        html = html + "<tr>"
+        html = html + "<td>" + str(numero) + "</td>"
+        html = html + "<td>" + juega + "</td>"
+        html = html + "<td>" + limpiar(jugador["nombre"]) + "</td>"
+        html = html + "<td>" + logica.texto_posiciones(jugador) + "</td>"
+        html = html + "<td>" + str(jugador["ritmo"]) + "</td>"
+        html = html + "<td>" + str(jugador["pase"]) + "</td>"
+        html = html + "<td>" + str(jugador["regate"]) + "</td>"
+        html = html + "<td>" + str(jugador["defensa"]) + "</td>"
+        html = html + "<td><b>" + media + "</b></td>"
+        html = html + "</tr>"
+        numero = numero + 1
+
+    mostrar_html("tabla_jugadores", html)
 
 
-# ---------- EQUIPOS ----------
+# ---------- 2. EQUIPOS ----------
 
-def tocar_armar(evento):
+def armar_equipos(evento):
     armar(False)
 
 
-def tocar_otra(evento):
+def otra_combinacion(evento):
     armar(True)
 
 
-# Arma equipos parejos. Si "es_otra" es True, no repite las combinaciones que ya salieron.
+# Arma los equipos. Si es_otra es True, no repite las combinaciones que ya salieron.
 def armar(es_otra):
-    formato = int(document.getElementById("formato").value)
-    cantidad = logica.convertir_numero(document.getElementById("cantidadEquipos").value)
-    usar_posiciones = document.getElementById("usarPosiciones").checked
+    formato = logica.convertir_numero(leer("formato"))
+    cantidad = logica.convertir_numero(leer("cantidad_equipos"))
+    usar_posiciones = tildado("usar_posiciones")
 
     if cantidad == None or cantidad < 2:
-        mostrar_mensaje("mensajeEquipos", "Tienen que ser al menos 2 equipos.", "error")
+        mostrar_mensaje("mensaje_equipos", "Tienen que ser al menos 2 equipos.", "error")
         return
 
     juegan = []
@@ -215,16 +229,16 @@ def armar(es_otra):
     necesarios = formato * cantidad
     if len(juegan) < necesarios:
         faltan = necesarios - len(juegan)
-        texto = "Faltan " + str(faltan) + " jugador(es): para " + str(cantidad) + " equipos de F" + str(formato)
-        texto = texto + " se necesitan " + str(necesarios) + " y juegan " + str(len(juegan)) + ". No inventamos jugadores."
-        mostrar_mensaje("mensajeEquipos", texto, "error")
+        texto = "Faltan " + str(faltan) + " jugadores: se necesitan " + str(necesarios)
+        texto = texto + " y juegan " + str(len(juegan)) + ". No inventamos jugadores."
+        mostrar_mensaje("mensaje_equipos", texto, "error")
         return
 
     if len(datos["partidos"]) > 0:
-        if not window.confirm("Hay un torneo armado. Si cambiás los equipos se borra el torneo. ¿Seguir?"):
+        if not window.confirm("Hay un torneo armado. Si cambiás los equipos se borra. ¿Seguir?"):
             return
 
-    # "Armar" empieza de cero. "Otra combinación" agrega la actual a las ya vistas.
+    # "Armar" empieza de cero. "Otra combinación" se acuerda de las que ya salieron.
     if es_otra and len(datos["equipos"]) > 0:
         datos["combinacionesVistas"].append(logica.clave_de_equipos(datos["equipos"]))
     else:
@@ -232,7 +246,7 @@ def armar(es_otra):
 
     equipos = logica.armar_equipos(juegan, cantidad, usar_posiciones, datos["combinacionesVistas"])
     if equipos == None:
-        mostrar_mensaje("mensajeEquipos", "No hay otra combinación distinta de las que ya viste.", "error")
+        mostrar_mensaje("mensaje_equipos", "No encontré otra combinación distinta.", "error")
         return
 
     datos["equipos"] = equipos
@@ -242,130 +256,113 @@ def armar(es_otra):
     texto = "¡Equipos armados!"
     sobran = len(juegan) - necesarios
     if sobran > 0:
-        texto = texto + " Sobran " + str(sobran) + " jugador(es) para F" + str(formato) + ": quedan como suplentes."
-    mostrar_mensaje("mensajeEquipos", texto, "ok")
-    mostrar_mensaje("mensajeTorneo", "", "")
+        texto = texto + " Sobran " + str(sobran) + " jugadores: quedan de suplentes."
+    mostrar_mensaje("mensaje_equipos", texto, "ok")
+    mostrar_mensaje("mensaje_torneo", "", "")
     guardar_datos()
     mostrar_todo()
 
 
-# Cuando eligen otro equipo en la lista que está al lado de cada jugador
-def tocar_mover(evento):
-    nombre = evento.target.getAttribute("data-nombre")
-    destino = int(evento.target.value)
-
-    if logica.mover_jugador(datos["equipos"], nombre, destino):
-        mostrar_mensaje("mensajeEquipos", nombre + " pasó a " + datos["equipos"][destino]["nombre"] + ".", "ok")
-        guardar_datos()
-    else:
-        mostrar_mensaje("mensajeEquipos", "No podés dejar un equipo sin jugadores.", "error")
-    mostrar_todo()
-
-
-def tocar_renombrar(evento):
-    indice = int(evento.target.getAttribute("data-equipo"))
-    viejo = datos["equipos"][indice]["nombre"]
-    nuevo = window.prompt("Nombre nuevo para " + viejo + ":", viejo)
-
-    # Si tocan "Cancelar" o lo dejan vacío, no hacemos nada
-    if not nuevo:
-        return
-    if nuevo.strip() == "":
+def mover_jugador(evento):
+    jugador = jugador_elegido("mover_jugador", "mensaje_equipos")
+    if jugador == None:
         return
 
-    if logica.renombrar_equipo(datos["equipos"], datos["partidos"], indice, nuevo):
+    numero_equipo = logica.convertir_numero(leer("mover_equipo"))
+    if numero_equipo == None or numero_equipo < 1 or numero_equipo > len(datos["equipos"]):
+        mostrar_mensaje("mensaje_equipos", "Poné un número de equipo que exista.", "error")
+        return
+
+    if logica.mover_jugador(datos["equipos"], jugador["nombre"], numero_equipo - 1):
+        equipo = datos["equipos"][numero_equipo - 1]
+        mostrar_mensaje("mensaje_equipos", limpiar(jugador["nombre"]) + " pasó a " + limpiar(equipo["nombre"]) + ".", "ok")
         guardar_datos()
         mostrar_todo()
     else:
-        mostrar_mensaje("mensajeEquipos", "Ya hay un equipo con ese nombre.", "error")
+        mostrar_mensaje("mensaje_equipos", "No se puede: no está en un equipo o su equipo quedaría vacío.", "error")
+
+
+def renombrar_equipo(evento):
+    numero_equipo = logica.convertir_numero(leer("renombrar_numero"))
+    nuevo = leer("renombrar_nombre").strip()
+
+    if numero_equipo == None or numero_equipo < 1 or numero_equipo > len(datos["equipos"]):
+        mostrar_mensaje("mensaje_equipos", "Poné un número de equipo que exista.", "error")
+        return
+    if nuevo == "":
+        mostrar_mensaje("mensaje_equipos", "Escribí el nombre nuevo.", "error")
+        return
+
+    if logica.renombrar_equipo(datos["equipos"], datos["partidos"], numero_equipo - 1, nuevo):
+        mostrar_mensaje("mensaje_equipos", "Listo, ahora se llama " + limpiar(nuevo) + ".", "ok")
+        poner("renombrar_nombre", "")
+        guardar_datos()
+        mostrar_todo()
+    else:
+        mostrar_mensaje("mensaje_equipos", "Ya hay un equipo con ese nombre.", "error")
 
 
 def mostrar_equipos():
-    contenedor = document.getElementById("equipos")
-    resumen = document.getElementById("resumenEquipos")
     equipos = datos["equipos"]
-
     if len(equipos) == 0:
-        contenedor.innerHTML = "<p>Todavía no armaste equipos.</p>"
-        resumen.textContent = ""
+        mostrar_html("equipos", "<p>Todavía no armaste equipos.</p>")
+        mostrar_html("resumen_equipos", "")
         return
 
-    # Solo avisamos de arqueros si hay jugadores con posición cargada
-    hay_posiciones = False
-    for jugador in datos["jugadores"]:
-        if jugador["posicion"] != "":
-            hay_posiciones = True
-
-    texto = ""
-    for e in range(len(equipos)):
-        equipo = equipos[e]
+    html = ""
+    numero_equipo = 1
+    for equipo in equipos:
         lista = logica.jugadores_del_equipo(datos["jugadores"], equipo)
-        puestos = logica.asignar_puestos(lista)
+        puestos = logica.puestos_del_equipo(lista)
         cuenta = logica.contar_puestos(puestos)
-        media = logica.redondear(logica.media_de_lista(lista, ""))
+        media = str(round(logica.media_de_lista(lista, ""), 1))
 
-        medias = ""
+        html = html + '<div class="equipo">'
+        html = html + "<h3>" + str(numero_equipo) + ". " + limpiar(equipo["nombre"]) + " (media " + media + ")</h3>"
+
+        # Medias de cada atributo
+        html = html + '<p class="gris">'
         for atributo in logica.ATRIBUTOS:
-            if medias != "":
-                medias = medias + " · "
-            medias = medias + logica.NOMBRES_ATRIBUTOS[atributo] + " "
-            medias = medias + logica.redondear(logica.media_de_lista(lista, atributo))
+            html = html + logica.NOMBRES_ATRIBUTOS[atributo] + " " + str(round(logica.media_de_lista(lista, atributo), 1)) + " &nbsp; "
+        html = html + "<br>"
+        # Cuántos hay en cada puesto
+        for puesto in logica.POSICIONES:
+            html = html + puesto + ": " + str(cuenta[puesto]) + " &nbsp; "
+        html = html + "</p>"
 
-        posiciones = ""
-        for posicion in logica.POSICIONES:
-            if posiciones != "":
-                posiciones = posiciones + " · "
-            posiciones = posiciones + str(cuenta[posicion]) + " " + posicion
-
-        texto = texto + '<div class="equipo">'
-        texto = texto + "<h3><span>" + escapar(equipo["nombre"]) + " — " + media + "</span>"
-        texto = texto + '<button class="chico secundario" py-click="tocar_renombrar" data-equipo="' + str(e) + '">Renombrar</button></h3>'
-        texto = texto + '<div class="medias">' + medias + "</div>"
-        texto = texto + '<div class="medias">Posiciones: ' + posiciones + "</div>"
-
+        # Avisos
         if len(lista) < datos["formatoActual"]:
-            formato = str(datos["formatoActual"])
-            texto = texto + '<p class="mensaje error">Tiene ' + str(len(lista)) + " y F" + formato + " pide " + formato + ".</p>"
-        if hay_posiciones and cuenta["ARQ"] == 0:
-            texto = texto + '<p class="mensaje error">Nadie de este equipo juega de arquero.</p>'
+            html = html + '<p class="error">Tiene menos jugadores de los que pide el formato.</p>'
+        if cuenta["ARQ"] == 0:
+            html = html + '<p class="error">Nadie de este equipo juega de arquero.</p>'
 
-        texto = texto + "<ul>"
+        # Jugadores en orden: arquero, defensores, medios y delanteros
+        html = html + "<ul>"
         for jugador in logica.ordenar_para_mostrar(lista, puestos):
             puesto = puestos[jugador["nombre"]]
+            texto_puesto = puesto
+            if puesto == "":
+                texto_puesto = "---"
+            numero_jugador = datos["jugadores"].index(jugador) + 1
+            html = html + "<li><b>" + texto_puesto + "</b> - N° " + str(numero_jugador) + " " + limpiar(jugador["nombre"])
+            if puesto != jugador["posicion"]:
+                html = html + " (juega de secundaria)"
+            html = html + ' <span class="gris">' + logica.texto_posiciones(jugador)
+            html = html + " - media " + str(round(logica.media_jugador(jugador), 1)) + "</span></li>"
+        html = html + "</ul>"
+        html = html + "</div>"
+        numero_equipo = numero_equipo + 1
 
-            # El cartelito con el puesto: lleno si es su posición principal,
-            # blanco si juega de una posición secundaria
-            cartel = ""
-            if puesto == jugador["posicion"]:
-                cartel = '<span class="puesto">' + puesto + "</span>"
-            elif puesto != "":
-                cartel = '<span class="puesto cambiado" title="Juega de su posición secundaria">' + puesto + "</span>"
+    mostrar_html("equipos", html)
 
-            # Lista para mover al jugador a otro equipo
-            opciones = ""
-            for o in range(len(equipos)):
-                elegido = ""
-                if o == e:
-                    elegido = "selected"
-                opciones = opciones + '<option value="' + str(o) + '" ' + elegido + ">" + escapar(equipos[o]["nombre"]) + "</option>"
-
-            texto = texto + "<li><span>" + cartel + " " + escapar(jugador["nombre"])
-            texto = texto + ' <span class="posicion">' + logica.texto_posiciones(jugador) + "</span>"
-            texto = texto + " (" + logica.redondear(logica.media_jugador(jugador)) + ")</span>"
-            texto = texto + '<select title="Mover a otro equipo" py-change="tocar_mover" data-nombre="' + escapar(jugador["nombre"]) + '">'
-            texto = texto + opciones + "</select></li>"
-        texto = texto + "</ul></div>"
-
-    contenedor.innerHTML = texto
-
-    promedio = logica.promedio_de_equipos(datos["jugadores"], equipos)
-    diferencia = logica.diferencia_entre_equipos(datos["jugadores"], equipos)
-    texto = "Promedio de las medias: " + logica.redondear(promedio)
-    texto = texto + " · Diferencia entre el más fuerte y el más débil: " + str(round(diferencia, 2))
-    resumen.textContent = texto
+    promedio = round(logica.promedio_de_equipos(datos["jugadores"], equipos), 1)
+    diferencia = round(logica.diferencia_entre_equipos(datos["jugadores"], equipos), 2)
+    texto = "Promedio de las medias: " + str(promedio)
+    texto = texto + " - Diferencia entre el más fuerte y el más débil: " + str(diferencia)
+    mostrar_html("resumen_equipos", texto)
 
 
-# ---------- TORNEO ----------
+# ---------- 3. TORNEO ----------
 
 def nombres_de_equipos():
     nombres = []
@@ -374,114 +371,99 @@ def nombres_de_equipos():
     return nombres
 
 
-def tocar_torneo(evento):
+def armar_torneo(evento):
     if len(datos["equipos"]) < 2:
-        mostrar_mensaje("mensajeTorneo", "Primero armá al menos 2 equipos.", "error")
+        mostrar_mensaje("mensaje_torneo", "Primero armá al menos 2 equipos.", "error")
         return
     if len(datos["partidos"]) > 0:
         if not window.confirm("Ya hay un torneo. Si armás otro se borran los resultados. ¿Seguir?"):
             return
 
-    ida_y_vuelta = document.getElementById("idaYVuelta").checked
-    datos["partidos"] = logica.crear_fixture(nombres_de_equipos(), ida_y_vuelta)
-    mostrar_mensaje("mensajeTorneo", "Torneo armado: " + str(len(datos["partidos"])) + " partidos.", "ok")
+    datos["partidos"] = logica.crear_fixture(nombres_de_equipos(), tildado("ida_y_vuelta"))
+    mostrar_mensaje("mensaje_torneo", "Torneo armado: " + str(len(datos["partidos"])) + " partidos.", "ok")
     guardar_datos()
     mostrar_todo()
 
 
-def tocar_guardar_resultado(evento):
-    indice = int(evento.target.getAttribute("data-partido"))
-    partido = datos["partidos"][indice]
-    texto_local = document.getElementById("local" + str(indice)).value.strip()
-    texto_visitante = document.getElementById("visitante" + str(indice)).value.strip()
+def guardar_resultado(evento):
+    numero = logica.convertir_numero(leer("numero_partido"))
+    goles_local = logica.convertir_numero(leer("goles_local"))
+    goles_visitante = logica.convertir_numero(leer("goles_visitante"))
 
-    # Si borran los dos, el partido vuelve a "sin jugar"
-    if texto_local == "" and texto_visitante == "":
-        partido["golesLocal"] = None
-        partido["golesVisitante"] = None
-    else:
-        goles_local = logica.convertir_numero(texto_local)
-        goles_visitante = logica.convertir_numero(texto_visitante)
-        if goles_local == None or goles_visitante == None:
-            mostrar_mensaje("mensajeTorneo", "Los goles tienen que ser números enteros desde 0.", "error")
-            return
-        partido["golesLocal"] = goles_local
-        partido["golesVisitante"] = goles_visitante
+    if numero == None or numero < 1 or numero > len(datos["partidos"]):
+        mostrar_mensaje("mensaje_torneo", "Poné un número de partido del fixture.", "error")
+        return
+    if goles_local == None or goles_visitante == None:
+        mostrar_mensaje("mensaje_torneo", "Los goles tienen que ser números desde 0.", "error")
+        return
 
-    mostrar_mensaje("mensajeTorneo", "Resultado guardado.", "ok")
+    partido = datos["partidos"][numero - 1]
+    partido["golesLocal"] = goles_local
+    partido["golesVisitante"] = goles_visitante
+    mostrar_mensaje("mensaje_torneo", "Resultado guardado.", "ok")
+    poner("numero_partido", "")
+    poner("goles_local", "")
+    poner("goles_visitante", "")
     guardar_datos()
     mostrar_todo()
 
 
 def mostrar_fixture():
-    contenedor = document.getElementById("fixture")
     partidos = datos["partidos"]
     if len(partidos) == 0:
-        contenedor.innerHTML = "<p>Todavía no armaste un torneo.</p>"
+        mostrar_html("fixture", "<p>Todavía no armaste un torneo.</p>")
         return
 
-    texto = ""
+    html = ""
     for fecha in range(1, logica.ultima_fecha(partidos) + 1):
-        texto = texto + '<div class="fecha"><h4>Fecha ' + str(fecha) + "</h4>"
-        for i in range(len(partidos)):
-            partido = partidos[i]
-            if partido["fecha"] != fecha:
-                continue
-
-            goles_local = ""
-            goles_visitante = ""
-            if partido["golesLocal"] != None:
-                goles_local = str(partido["golesLocal"])
-                goles_visitante = str(partido["golesVisitante"])
-
-            texto = texto + '<div class="partido">'
-            texto = texto + "<span>" + escapar(partido["local"]) + "</span>"
-            texto = texto + '<input type="number" min="0" id="local' + str(i) + '" value="' + goles_local + '">'
-            texto = texto + "<span>-</span>"
-            texto = texto + '<input type="number" min="0" id="visitante' + str(i) + '" value="' + goles_visitante + '">'
-            texto = texto + "<span>" + escapar(partido["visitante"]) + "</span>"
-            texto = texto + '<button class="chico" py-click="tocar_guardar_resultado" data-partido="' + str(i) + '">Guardar</button>'
-            texto = texto + "</div>"
-
+        html = html + "<h4>Fecha " + str(fecha) + "</h4><ul>"
+        numero = 1
+        for partido in partidos:
+            if partido["fecha"] == fecha:
+                if partido["golesLocal"] == None:
+                    resultado = "sin jugar"
+                else:
+                    resultado = str(partido["golesLocal"]) + " a " + str(partido["golesVisitante"])
+                html = html + "<li>Partido " + str(numero) + ": " + limpiar(partido["local"])
+                html = html + " vs " + limpiar(partido["visitante"]) + " - <b>" + resultado + "</b></li>"
+            numero = numero + 1
         libres = logica.libres_en_fecha(nombres_de_equipos(), partidos, fecha)
         if len(libres) > 0:
-            texto = texto + '<p class="libre">Libre: ' + escapar(", ".join(libres)) + "</p>"
-        texto = texto + "</div>"
+            html = html + '<li class="gris">Libre: ' + limpiar(", ".join(libres)) + "</li>"
+        html = html + "</ul>"
 
-    contenedor.innerHTML = texto
+    mostrar_html("fixture", html)
 
 
 def mostrar_tabla_de_posiciones():
-    tabla = document.getElementById("tablaPosiciones")
     if len(datos["partidos"]) == 0:
-        tabla.innerHTML = ""
+        mostrar_html("tabla_posiciones", "")
         return
 
     filas = logica.calcular_tabla(nombres_de_equipos(), datos["partidos"])
-    texto = ""
-    for i in range(len(filas)):
-        fila = filas[i]
-        diferencia = str(fila["dg"])
-        if fila["dg"] > 0:
-            diferencia = "+" + diferencia
-        texto = texto + "<tr>"
-        texto = texto + "<td>" + str(i + 1) + "</td>"
-        texto = texto + '<td class="nombre">' + escapar(fila["equipo"]) + "</td>"
-        texto = texto + "<td>" + str(fila["pj"]) + "</td>"
-        texto = texto + "<td>" + str(fila["g"]) + "</td>"
-        texto = texto + "<td>" + str(fila["e"]) + "</td>"
-        texto = texto + "<td>" + str(fila["p"]) + "</td>"
-        texto = texto + "<td>" + str(fila["gf"]) + "</td>"
-        texto = texto + "<td>" + str(fila["gc"]) + "</td>"
-        texto = texto + "<td>" + diferencia + "</td>"
-        texto = texto + "<td><b>" + str(fila["pts"]) + "</b></td>"
-        texto = texto + "</tr>"
-    tabla.innerHTML = texto
+    html = ""
+    posicion = 1
+    for fila in filas:
+        html = html + "<tr>"
+        html = html + "<td>" + str(posicion) + "</td>"
+        html = html + "<td>" + limpiar(fila["equipo"]) + "</td>"
+        html = html + "<td>" + str(fila["pj"]) + "</td>"
+        html = html + "<td>" + str(fila["g"]) + "</td>"
+        html = html + "<td>" + str(fila["e"]) + "</td>"
+        html = html + "<td>" + str(fila["p"]) + "</td>"
+        html = html + "<td>" + str(fila["gf"]) + "</td>"
+        html = html + "<td>" + str(fila["gc"]) + "</td>"
+        html = html + "<td>" + str(fila["dg"]) + "</td>"
+        html = html + "<td><b>" + str(fila["pts"]) + "</b></td>"
+        html = html + "</tr>"
+        posicion = posicion + 1
+
+    mostrar_html("tabla_posiciones", html)
 
 
 # ---------- BORRAR TODO ----------
 
-def tocar_borrar_todo(evento):
+def borrar_todo(evento):
     if not window.confirm("¿Seguro? Se borran jugadores, equipos y torneo."):
         return
     datos["jugadores"] = []
@@ -492,7 +474,7 @@ def tocar_borrar_todo(evento):
     mostrar_todo()
 
 
-# ---------- DIBUJAR TODO ----------
+# ---------- MOSTRAR TODO ----------
 
 def mostrar_todo():
     mostrar_jugadores()
@@ -502,11 +484,9 @@ def mostrar_todo():
 
 
 # ---------- ARRANQUE ----------
+# Esto se hace una sola vez, cuando abre la página
 
 cargar_datos()
-document.getElementById("formato").value = str(datos["formatoActual"])
+poner("formato", str(datos["formatoActual"]))
 mostrar_todo()
-
-# Python ya cargó: sacamos el cartel de "Cargando" y mostramos la página
-document.getElementById("cargando").hidden = True
-document.getElementById("contenido").hidden = False
+mostrar_html("cargando", "")
