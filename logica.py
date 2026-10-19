@@ -2,9 +2,7 @@
 # logica.py - Las cuentas de Fulbito
 # ==========================================
 # Acá están las cuentas: medias, armar equipos, fixture y tabla.
-# Lo usan los dos programas:
-#   main.py   = el programa de consola
-#   pagina.py = la página web
+# Lo usa pagina.py, que es el programa de la página web.
 
 import random
 
@@ -37,20 +35,8 @@ def buscar_jugador(jugadores, nombre):
     return None
 
 
-# Completa lo que falte en los datos guardados por versiones viejas del programa
+# Completa lo que falte en los datos guardados por versiones viejas de la página
 def arreglar_datos(datos):
-    # La primera versión guardaba los jugadores en inglés
-    if "players" in datos:
-        datos["jugadores"] = []
-        for viejo in datos["players"]:
-            nuevo = {}
-            nuevo["nombre"] = viejo["name"]
-            nuevo["ritmo"] = viejo["pace"]
-            nuevo["pase"] = viejo["passing"]
-            nuevo["regate"] = viejo["dribbling"]
-            nuevo["defensa"] = viejo["defending"]
-            datos["jugadores"].append(nuevo)
-
     if "jugadores" not in datos:
         datos["jugadores"] = []
     if "equipos" not in datos:
