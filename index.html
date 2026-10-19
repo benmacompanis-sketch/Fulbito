@@ -4,148 +4,145 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Fulbito</title>
-  <link rel="stylesheet" href="style.css">
 
   <!-- PyScript: hace que la página funcione con Python -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@pyscript/core@0.7.31/dist/core.css">
   <script type="module" src="https://cdn.jsdelivr.net/npm/@pyscript/core@0.7.31/dist/core.js"></script>
 </head>
 <body>
 
   <h1>⚽ Fulbito</h1>
-  <p class="centrado">Organizador de equipos y torneos parejos</p>
-  <p id="cargando" class="centrado">Cargando Python... la primera vez tarda unos segundos.</p>
+  <p>Organizador de equipos y torneos parejos</p>
+  <p id="cargando">Cargando Python... la primera vez tarda unos segundos.</p>
+
+  <hr>
 
   <!-- ===== 1. JUGADORES ===== -->
-  <div class="caja">
-    <h2>1. Jugadores</h2>
+  <h2>1. Jugadores</h2>
 
-    <p>Nombre: <input type="text" id="nombre"></p>
-    <p>
-      Ritmo: <input type="number" id="ritmo" class="corto">
-      Pase: <input type="number" id="pase" class="corto">
-      Regate: <input type="number" id="regate" class="corto">
-      Defensa: <input type="number" id="defensa" class="corto">
-    </p>
-    <p>
-      Posición principal:
-      <select id="posicion">
-        <option value="">Elegí...</option>
-        <option value="ARQ">Arquero</option>
-        <option value="DEF">Defensor</option>
-        <option value="MED">Mediocampista</option>
-        <option value="DEL">Delantero</option>
-      </select>
-    </p>
-    <p>
-      También puede jugar de:
-      <input type="checkbox" id="secundaria_ARQ"> Arquero
-      <input type="checkbox" id="secundaria_DEF"> Defensor
-      <input type="checkbox" id="secundaria_MED"> Mediocampista
-      <input type="checkbox" id="secundaria_DEL"> Delantero
-    </p>
-    <button py-click="guardar_jugador">Guardar jugador</button>
-    <p id="mensaje_jugador" class="mensaje"></p>
+  <p>Nombre: <input type="text" id="nombre"></p>
+  <p>
+    Ritmo: <input type="number" id="ritmo">
+    Pase: <input type="number" id="pase">
+    Regate: <input type="number" id="regate">
+    Defensa: <input type="number" id="defensa">
+  </p>
+  <p>
+    Posición principal:
+    <select id="posicion">
+      <option value="">Elegí...</option>
+      <option value="ARQ">Arquero</option>
+      <option value="DEF">Defensor</option>
+      <option value="MED">Mediocampista</option>
+      <option value="DEL">Delantero</option>
+    </select>
+  </p>
+  <p>
+    También puede jugar de:
+    <input type="checkbox" id="secundaria_ARQ"> Arquero
+    <input type="checkbox" id="secundaria_DEF"> Defensor
+    <input type="checkbox" id="secundaria_MED"> Mediocampista
+    <input type="checkbox" id="secundaria_DEL"> Delantero
+  </p>
+  <button py-click="guardar_jugador">Guardar jugador</button>
+  <p id="mensaje_jugador"></p>
 
-    <table>
-      <tr>
-        <th>N°</th>
-        <th>Juega</th>
-        <th>Nombre</th>
-        <th>Posición</th>
-        <th>Ritmo</th>
-        <th>Pase</th>
-        <th>Regate</th>
-        <th>Defensa</th>
-        <th>Media</th>
-      </tr>
-      <tbody id="tabla_jugadores"></tbody>
-    </table>
+  <table border="1" cellpadding="5">
+    <tr>
+      <th>N°</th>
+      <th>Juega</th>
+      <th>Nombre</th>
+      <th>Posición</th>
+      <th>Ritmo</th>
+      <th>Pase</th>
+      <th>Regate</th>
+      <th>Defensa</th>
+      <th>Media</th>
+    </tr>
+    <tbody id="tabla_jugadores"></tbody>
+  </table>
 
-    <p>
-      Jugador número: <input type="number" id="numero_jugador" class="corto">
-      <button py-click="editar_jugador">Editar</button>
-      <button py-click="cambiar_juega">Juega / No juega</button>
-      <button py-click="borrar_jugador">Borrar</button>
-    </p>
-  </div>
+  <p>
+    Jugador número: <input type="number" id="numero_jugador">
+    <button py-click="editar_jugador">Editar</button>
+    <button py-click="cambiar_juega">Juega / No juega</button>
+    <button py-click="borrar_jugador">Borrar</button>
+  </p>
+
+  <hr>
 
   <!-- ===== 2. EQUIPOS ===== -->
-  <div class="caja">
-    <h2>2. Equipos</h2>
+  <h2>2. Equipos</h2>
 
-    <p>
-      Formato:
-      <select id="formato">
-        <option value="5">F5</option>
-        <option value="8">F8</option>
-        <option value="11">F11</option>
-      </select>
-      Cantidad de equipos: <input type="number" id="cantidad_equipos" value="2" class="corto">
-    </p>
-    <p><input type="checkbox" id="usar_posiciones" checked> Emparejar también por posiciones</p>
-    <button py-click="armar_equipos">Armar equipos parejos</button>
-    <button py-click="otra_combinacion">Otra combinación</button>
-    <p id="mensaje_equipos" class="mensaje"></p>
+  <p>
+    Formato:
+    <select id="formato">
+      <option value="5">F5</option>
+      <option value="8">F8</option>
+      <option value="11">F11</option>
+    </select>
+    Cantidad de equipos: <input type="number" id="cantidad_equipos" value="2">
+  </p>
+  <p><input type="checkbox" id="usar_posiciones" checked> Emparejar también por posiciones</p>
+  <button py-click="armar_equipos">Armar equipos parejos</button>
+  <button py-click="otra_combinacion">Otra combinación</button>
+  <p id="mensaje_equipos"></p>
 
-    <div id="equipos"></div>
-    <p id="resumen_equipos"></p>
+  <div id="equipos"></div>
+  <p id="resumen_equipos"></p>
 
-    <h3>Cambiar los equipos a mano</h3>
-    <p>
-      Pasar al jugador número <input type="number" id="mover_jugador" class="corto">
-      al equipo número <input type="number" id="mover_equipo" class="corto">
-      <button py-click="mover_jugador">Mover</button>
-    </p>
-    <p>
-      Al equipo número <input type="number" id="renombrar_numero" class="corto">
-      ponerle de nombre <input type="text" id="renombrar_nombre">
-      <button py-click="renombrar_equipo">Cambiar nombre</button>
-    </p>
-  </div>
+  <h3>Cambiar los equipos a mano</h3>
+  <p>
+    Pasar al jugador número <input type="number" id="mover_jugador">
+    al equipo número <input type="number" id="mover_equipo">
+    <button py-click="mover_jugador">Mover</button>
+  </p>
+  <p>
+    Al equipo número <input type="number" id="renombrar_numero">
+    ponerle de nombre <input type="text" id="renombrar_nombre">
+    <button py-click="renombrar_equipo">Cambiar nombre</button>
+  </p>
+
+  <hr>
 
   <!-- ===== 3. TORNEO ===== -->
-  <div class="caja">
-    <h2>3. Torneo</h2>
+  <h2>3. Torneo</h2>
 
-    <p>
-      <input type="checkbox" id="ida_y_vuelta"> Ida y vuelta
-      <button py-click="armar_torneo">Armar torneo</button>
-    </p>
-    <p id="mensaje_torneo" class="mensaje"></p>
-
-    <div id="fixture"></div>
-
-    <p>
-      Partido número <input type="number" id="numero_partido" class="corto">
-      Goles del local <input type="number" id="goles_local" class="corto">
-      Goles del visitante <input type="number" id="goles_visitante" class="corto">
-      <button py-click="guardar_resultado">Guardar resultado</button>
-    </p>
-
-    <h3>Tabla de posiciones</h3>
-    <table>
-      <tr>
-        <th>#</th>
-        <th>Equipo</th>
-        <th>PJ</th>
-        <th>G</th>
-        <th>E</th>
-        <th>P</th>
-        <th>GF</th>
-        <th>GC</th>
-        <th>DG</th>
-        <th>Puntos</th>
-      </tr>
-      <tbody id="tabla_posiciones"></tbody>
-    </table>
-  </div>
-
-  <p class="centrado">
-    No inventa jugadores, no repite equipos y los atributos los ponés vos.
-    <br>
-    <button py-click="borrar_todo" class="rojo">Borrar todos los datos</button>
+  <p>
+    <input type="checkbox" id="ida_y_vuelta"> Ida y vuelta
+    <button py-click="armar_torneo">Armar torneo</button>
   </p>
+  <p id="mensaje_torneo"></p>
+
+  <div id="fixture"></div>
+
+  <p>
+    Partido número <input type="number" id="numero_partido">
+    Goles del local <input type="number" id="goles_local">
+    Goles del visitante <input type="number" id="goles_visitante">
+    <button py-click="guardar_resultado">Guardar resultado</button>
+  </p>
+
+  <h3>Tabla de posiciones</h3>
+  <table border="1" cellpadding="5">
+    <tr>
+      <th>#</th>
+      <th>Equipo</th>
+      <th>PJ</th>
+      <th>G</th>
+      <th>E</th>
+      <th>P</th>
+      <th>GF</th>
+      <th>GC</th>
+      <th>DG</th>
+      <th>Puntos</th>
+    </tr>
+    <tbody id="tabla_posiciones"></tbody>
+  </table>
+
+  <hr>
+
+  <p>No inventa jugadores, no repite equipos y los atributos los ponés vos.</p>
+  <button py-click="borrar_todo">Borrar todos los datos</button>
 
   <!-- El programa de la página está en pagina.py, y las cuentas en logica.py -->
   <script type="py" src="pagina.py" config='{"files": {"logica.py": ""}}'></script>

@@ -4,7 +4,7 @@ Arma equipos parejos a partir de los atributos que vos cargás de cada jugador
 (Ritmo, Pase, Regate y Defensa) y de sus posiciones, y organiza torneos todos
 contra todos. Para F5, F8 y F11.
 
-Está hecho en **Python básico**: funciones, `if`, `for`, `while`, listas y
+Está hecho solo con **Python básico y HTML** (sin CSS ni JavaScript propio): funciones, `if`, `for`, `while`, listas y
 diccionarios. Hay dos formas de usarlo, que hacen lo mismo:
 
 - **Página web** (`index.html` + `pagina.py`): se usa desde el navegador,
@@ -18,8 +18,7 @@ diccionarios. Hay dos formas de usarlo, que hacen lo mismo:
 | `logica.py` | Todas las cuentas: medias, armar equipos parejos, puestos, fixture y tabla. Lo usan las dos versiones. |
 | `main.py` | La versión de consola (menú con `input` y `print`). Guarda en `datos.json`. |
 | `pagina.py` | Lo que hace funcionar la página web. |
-| `index.html` | La estructura de la página. Cada botón dice qué función de `pagina.py` llama (`py-click="..."`). |
-| `style.css` | Los colores y el diseño de la página. |
+| `index.html` | La página, en HTML puro (sin CSS). Cada botón dice qué función de `pagina.py` llama (`py-click="..."`). |
 | `pruebas.py` | Pruebas que revisan que las cuentas den bien. |
 
 ## Cómo se usa

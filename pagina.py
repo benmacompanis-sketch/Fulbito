@@ -44,11 +44,11 @@ def mostrar_html(id_elemento, html):
     document.getElementById(id_elemento).innerHTML = html
 
 
-# Muestra un mensaje. tipo puede ser "ok" (verde) o "error" (rojo).
+# Muestra un mensaje. Si tipo es "error", lo muestra en negrita.
 def mostrar_mensaje(id_mensaje, texto, tipo):
-    mensaje = document.getElementById(id_mensaje)
-    mensaje.innerHTML = texto
-    mensaje.className = "mensaje " + tipo
+    if tipo == "error":
+        texto = "<b>Error: " + texto + "</b>"
+    mostrar_html(id_mensaje, texto)
 
 
 # Para que un nombre con < o > no rompa la página
@@ -317,24 +317,24 @@ def mostrar_equipos():
         cuenta = logica.contar_puestos(puestos)
         media = str(round(logica.media_de_lista(lista, ""), 1))
 
-        html = html + '<div class="equipo">'
+        html = html + "<hr>"
         html = html + "<h3>" + str(numero_equipo) + ". " + limpiar(equipo["nombre"]) + " (media " + media + ")</h3>"
 
         # Medias de cada atributo
-        html = html + '<p class="gris">'
+        html = html + "<p><small>"
         for atributo in logica.ATRIBUTOS:
             html = html + logica.NOMBRES_ATRIBUTOS[atributo] + " " + str(round(logica.media_de_lista(lista, atributo), 1)) + " &nbsp; "
         html = html + "<br>"
         # Cuántos hay en cada puesto
         for puesto in logica.POSICIONES:
             html = html + puesto + ": " + str(cuenta[puesto]) + " &nbsp; "
-        html = html + "</p>"
+        html = html + "</small></p>"
 
         # Avisos
         if len(lista) < datos["formatoActual"]:
-            html = html + '<p class="error">Tiene menos jugadores de los que pide el formato.</p>'
+            html = html + "<p><b>Ojo: tiene menos jugadores de los que pide el formato.</b></p>"
         if cuenta["ARQ"] == 0:
-            html = html + '<p class="error">Nadie de este equipo juega de arquero.</p>'
+            html = html + "<p><b>Ojo: nadie de este equipo juega de arquero.</b></p>"
 
         # Jugadores en orden: arquero, defensores, medios y delanteros
         html = html + "<ul>"
@@ -347,10 +347,9 @@ def mostrar_equipos():
             html = html + "<li><b>" + texto_puesto + "</b> - N° " + str(numero_jugador) + " " + limpiar(jugador["nombre"])
             if puesto != jugador["posicion"]:
                 html = html + " (juega de secundaria)"
-            html = html + ' <span class="gris">' + logica.texto_posiciones(jugador)
-            html = html + " - media " + str(round(logica.media_jugador(jugador), 1)) + "</span></li>"
+            html = html + " <small>" + logica.texto_posiciones(jugador)
+            html = html + " - media " + str(round(logica.media_jugador(jugador), 1)) + "</small></li>"
         html = html + "</ul>"
-        html = html + "</div>"
         numero_equipo = numero_equipo + 1
 
     mostrar_html("equipos", html)
@@ -429,7 +428,7 @@ def mostrar_fixture():
             numero = numero + 1
         libres = logica.libres_en_fecha(nombres_de_equipos(), partidos, fecha)
         if len(libres) > 0:
-            html = html + '<li class="gris">Libre: ' + limpiar(", ".join(libres)) + "</li>"
+            html = html + "<li><i>Libre: " + limpiar(", ".join(libres)) + "</i></li>"
         html = html + "</ul>"
 
     mostrar_html("fixture", html)
